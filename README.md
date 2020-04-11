@@ -50,7 +50,7 @@ In summary, Think of it as an echo dot activated by a motion sensor,
 protected by face recognition. In a Teddy bear.
 
 ## Bill of Materials
-1. (https://gettrumpybear.com/)[Trumpy Bear (TM)]
+1. [https://gettrumpybear.com/](Trumpy Bear (TM))
 2. Raspberry Pi3 (pi4 might be too hot, pi0 doesn't have needed punch)
 3. Raspberry camera with day and night capabilities
 4. USB headphone dongle
