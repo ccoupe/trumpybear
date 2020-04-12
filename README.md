@@ -74,9 +74,12 @@ but it will be cheaper than the alternatives. Why? Neural nets are computation
 hogs. A dedicated i5 won't have the oopmh. An i7 might but either one of those
 is serious money with electrical power and space issues. You could put an expensive
 NVidia graphics card in a machine and use that. If you already have one of
-those cards then odds are your running Windows and Games -- I use is linux and can't help you.
+those cards then odds are your running Windows and Games or a bitcoin miner. 
+I use Linux and can't help you with Windows or Crypto Currency/.
 Could you use a Coral accelerator on the pi3 or a pi4 instead and run everything on one
-box? Probably. Try it and let me know. Most of those options are more expensive. 
+box? Probably. Try it and let me know. Most of those options are more expensive. Yes,
+You could run everything on the Jetson if you have enough usb ports but it
+would be clumsy - it can get hot. 
 
 Finally, the Jetson is 'damn cool' and you wanted a reason to get one. You're Welcome.
 
@@ -294,12 +297,43 @@ changing the startup process. Again. We'll probably be back at some date in the
 future to change that to whatever the next better way is. 
 
 ### Camera and motion detector
-#### Install camera. Test.
-#### Create a New directory
-[Yes, it's another project of mine](https://github.com/ccoupe/mqtt-camera-motion)
-Follow those instructions.
-TODO: Update those instructions - the config .json is wrong and incomplete.
-Test the motiondetector with Hubitat.
+TrumpyBear usea a camera as a motionsensor as well as take picture and
+video clips. As a motionsensor it has some percularities. It can get
+confused by lights going off and on. It can be very chatty, constantly
+finding motion and not finding it and telling Hubitat all about it.
+There is a whole lot of 'it works for me' in the code as I tamed those issues. 
+
+[It's another project of mine](https://github.com/ccoupe/mqtt-camera-motion)
+and I have two of them in my house, not counting TrumpyBear. They will keep 
+the lights on as long as they identify a person. That can be multiple hours long
+sitting in my comfy chair or working in my office.
+
+#### Install camera. 
+I chose a raspberry (CSI) camera that claims to work in both day and night.
+Connect it to the raspberry. Be very careful with the clip on the connector.
+I can break and you will curse loadly if you fat finger it.
+
+The interwebs are full of instructions on installing and testing the camera.
+Find one and follow it.
+
+#### Motionsenor Code
+You need a different directory, next to trumpybear, not below it, not above it, 
+Next to it. Sadly, I called mine 'mqtt-vision'. You can do better and rename
+it after `git clone https://github.com/ccoupe/mqtt-camera-motion.git`
+
+It is a separate device from the TTS alarm thing. MQTT thinks they are
+different, Hubitat thinks they are different and they are two different
+programs on the pi. Not dependent on each other. Yet.
+ 
+[Follow those instructions](https://github.com/ccoupe/mqtt-camera-motion)
+It should go without saying that you want to test the motionsenor with
+Hubitat. That could take several days, a few minutes per day it all it takes.
+Without the AI/ML enabled it's a chatty device.
+
+It works much better when you turn on the AI. I like Cnn_Shapes but there
+are situations where the other algorithms will work better.  It all depends
+on where the bear sits and what it can 'see'
+
 
 ## Jetson Nano or GPU or Coral
 ### Setup
@@ -310,7 +344,60 @@ ssh and nfs and ...
 ### Turn on Shape Detection in Hubitat. Test
 
 ### Conversation Street
-#### TrumpuBear's Microphone
-uncomment the line setting the mic volume in ~/.trumpybear/trumpybear.sh
-#### Mycroft
-#### Alexa
+Here is the reason we need pulseaudio: Mycroft wants its. Alexa Wants it.
+When you have pulseaudio it pretends to hide ALSA. You can use alsa apps like
+aplay and arecord because pulseaudio "wraps" it. It does not wrap alsamixer
+and all the setting you made in .asoundrc. I believe it ignores them but won't
+know that until somebody tells that. You use pacmd and pactl to set things up. If
+you have a monitor hooked up to the Pi then you can play with pauvcontrol but it's
+lame. Pretty, but lame. So, scan the man pages for pacmd and pactl to get feel for
+what is available. 
+
+You are going to get some background noise with a microphone. Some mic's are
+better than others and some are cheaper than others by orders of magnitude. I'm not
+going to sing to Trumpy Bear and record my song. But a little mic, clipped to
+his tie would be in character and doesn't cost that much. I also have a little usb dongle mic
+and it does NOT work well with a Pi - it's fine on my big Linux x86_64 box but not the
+Pi.  You are going to have to experiment with setting the gain of your mic for the distance
+you expect people to interact from. You can spend a lot of money chasing perfection.
+
+Headphones eliminate a lot of these issues but you don't want people to wear them 
+just to talk with Trumpy. A USB headphone dongle is good for hooking up the mic but
+don't try using the speaker jack on it and connecting to the bluetooth speaker. 
+I had a lot some hum that way and I can hear hum and fans. I can hear fans and 
+I don't like the hear them. Perhaps that's just me.
+
+#### Setup Microphone
+
+`pactl list short sinks` will list your output devices - you want the index number
+of the one you want to use. Likewise `pactl list short sources` will list the 
+mic's available. Don't pick one that says 'monitor' unless you really know all this
+stuff and can pretend you didn't hear my warning. You can alway fart around with those
+later when you have nothing better to do. 
+
+Lets record something and play it back.
+```sh
+arecord foo.wav
+```
+Speak normally for a few seconds and then ^C to quit. Yes, there are command line switches
+but why bother? Now play it back with `aplay foo.wav`. If you are extremely lucky the volume
+be good enough. Odds are you are going to need to adjust the gain
+```sh
+pactl set-source-volume 1 120%
+```
+Obviously 120% is the number for my mic. Yours will be different. Don't adjust the speaker (sink)
+volume to make it better. Yours might need 80% or 250%.  Repeat until it seems OK to your.
+Now uncomment and edit that line in ~/.trumpybear/trumpybear.sh. It's a good time to
+reboot to redo the record/play one more time to make sure the setting sticks.
+
+#### Mycroft or Alexa
+I'd prefer to use Alexa but if you've ever built it as part of their developer
+program you'd know how hard it is to build and work with and how it's not really setup
+to be used for casual things. You have to learn a whole lot of stuff In C++. That is
+more work than I want. If I have to, maybe someday or maybe never again. I haven't tried 
+the google kit but from what I've seen it's not going to be much fun either.
+
+[Mycroft](https://mycroft.ai/) has the advantage of being Free and Open Source
+and mostly uses Python and it has a Community you can hang around it a learn from.
+Of course there are tradeoff with maturity and completeness. I think for 
+talking Teddy Bear it may be good enough.
