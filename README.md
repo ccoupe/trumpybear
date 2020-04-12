@@ -336,10 +336,17 @@ on where the bear sits and what it can 'see'
 
 
 ## Jetson Nano or GPU or Coral
+[Refer back](https://github.com/ccoupe/mqtt-camera-motion) to the discussion
+on shape_server as a remote process. We can run shape_server on an optimized
+system. I'm using a Jetson Nano
 ### Setup
 You want to do all the network and setup things you did for the Pi setup,
 ssh and nfs and ...
 ### Opencv with CUDA support.
+Refer to any number of youtube and/or internet sites about building
+Opencv 4.1.2 with CUDA support for Python 3.6. Versions matter since I'm unsure
+of important differences I'm sticking to very current releases. 
+
 ### Our RPC servers
 ### Turn on Shape Detection in Hubitat. Test
 

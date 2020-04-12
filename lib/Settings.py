@@ -31,8 +31,9 @@ class Settings:
     else:
       self.our_IP = "192.168.1.255"
       self.macAddr = "de:ad:be:ef"
+    self.macAddr = self.macAddr.upper()
     self.load_settings(self.etcfname)
-    print("Settings from", self.etcfname)
+    self.log.info("Settings from %s" % self.etcfname)
     
   def load_settings(self, fn):
     conf = json.load(open(fn))
@@ -50,8 +51,8 @@ class Settings:
 
 
   def print(self):
-    print("==== Settings ====")
-    print(self.settings_serialize())
+    self.log.info("==== Settings ====")
+    self.log.info(self.settings_serialize())
   
   def settings_serialize(self):
     st = {}
