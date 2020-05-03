@@ -1,0 +1,122 @@
+id = name [and matching pictures], role 
+
+mycroft skills - awaken, insult
+Hubitat things
+  Turn on Light over bear.
+  mute yamaha
+Alexa switch 'turn on trumpy bear'
+
+trumpybear:
+  speak 'Trumpy Bear sees you'
+  while not known: 
+    pict_id = take picture
+    name = skill_get_name()
+    id = check(pict_id, name)
+    if id == fail:
+      act = escalate_warning
+      if act < quit_level
+        continue
+      else:
+        break
+    elif id is rasa_special:
+      skill_start_rasa(name)
+      break
+    else:
+      speak 'Mycroft Available'
+      skill_normal()
+      break
+  reset trumpybear
+                               wait   wait
+State                   get    pict   pict
+event:     starting     name   front  left  insult   mycroft  rasa  alarm  ending
+start       (1)
+mqttreply                (2)                 (3)
+have frpict                      (4)
+have sdpict                            (6)
+recog                            (5)
+timer(5s)                                    (3)
+timer(5m)                                             (7)             (8)
+
+(1) ask 'awaken the trumpy bear', => get_name
+(2) if registered(name)  => mycroft|rasa|wait_pict_fr
+    else: push_state(), incr ctr, ask "insult", => insult 
+(3) if less than 3 times, => pop_state()
+    else begin_alarm(), => alarm
+(4) do_recog(), => wait_pict_fr 
+(5) if pict matches name, => mycroft
+    else => wait_pict_left
+(6) register(name,fr,side), => mycroft
+(7) if registerd but 'unknown' role then, begin alarm, role => alarm
+(8) kill alarm, =>ending
+
+Chatbot: RASA - running on Nano? It uses TensorFlow new TF, so nope.
+  Integrate with Mycroft on pi3 with mic and speakers.
+                 Mycroft on bronco with webcam mic and speakers.
+  https://mycroft.ai/blog/connecting-rasa-to-mycroft-a-guide/
+  Can/Should re-archtect Trumpybear - maybe Rasa is in charge
+  and Hubitat/MQTT triggers RASA External events
+  Can integrate with RabbitMQ, Picka, Kafka  -- not MQTT? 
+    Find a way to run face detection
+    Find a way to indicated "Bad Guy" so we can inform MQTT/Hubitat
+  
+  trumpybear wakes up and starts a mycroft skill 'rasa_auth':
+    asks name
+      if known name return(TrumpyBear::role, privledges)
+      if unknown name
+          conduct interview
+          callbacks to get picture?? Face  Recog
+          exits points return(TrumpyBear::UnWanted, None)
+  if Role.play start/continue 'rasa_boss' skill/dialog
+    questions to determine scenario to use
+
+
+Get test images
+  trumpy.py --mode capture
+    capture continuously for 2 secs
+    pass capture args ~/Projects/xxxx/<start-datetime>/pic<n>.jpg
+  mqtt-motion.py --user 
+    sudo pi - so it can write to ~/Projects/xxxx/<start-datetime>/pic<n>.jpg
+
+Gender/Age recog
+  https://towardsdatascience.com/predict-age-and-gender-using-convolutional-neural-network-and-opencv-fd90390e3ce6
+Fasjion/Clothing recog
+  https://www.pyimagesearch.com/2019/02/11/fashion-mnist-with-keras-and-deep-learning/
+------ Basics -----
+
+hubitat (groovy/mqtt)
+  trumpy_cam-->trumpy_motion_zone -> trumpy_motion_app
+    [mode == away or sleep] - turn on table lamp
+               /\           - turn on Trumpy Switch
+               |
+  patio_door --+
+                          
+  trumpy_bear (momentary mqtt sw) -> publish ('homie/trumpy_bear/control/cmd/set',
+    {"cmd": "begin", "reply": "homie/trumpy_bear/control/set}
+  
+Note: alexa could set trumpy switch, so could dashboard/device or mosquitto_pub
+When trumpybear.goovy initializes/updates send
+  '{"cmd": "init", "reply": "trumpy_cam"}'
+  
+Python: 
+trumpy_bear.py
+  listens on 'homie/trumpy_bear/control/cmd/set 
+    parse json: cmd:, reply:, text:, path:
+    dispatch on 'cmd':
+
+  cmd == 'init'
+     publish 'init_wait' to homie/trumpy_bear/control/cmd
+     
+  cmd == 'begin'
+    publish 'beginning' to homie/trumpy_bear/control/cmd
+    publish '{cmd: capture, path: <path>, reply: homie/trumpy_bear/control/cmd/set}' to reply_topic
+  
+    
+  cmd == 'capture_done'
+    publish 'authenticating' to homie/trumpy_bear/control/cmd
+    rpc to face_server
+    magic happens.
+
+trumpy_cam.py
+  trumpy_cam.py recieves {cmd: capture: path: <path>, reply: <replyto>, }, writes frame to given file path
+    send 'cmd: capture_done' to  <replyto> topic
+        

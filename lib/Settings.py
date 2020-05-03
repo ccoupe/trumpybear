@@ -33,21 +33,21 @@ class Settings:
       self.macAddr = "de:ad:be:ef"
     self.macAddr = self.macAddr.upper()
     self.load_settings(self.etcfname)
+    self.status_topic = 'homie/'+self.homie_device+'/control/cmd'
+    # expand camera_topic
+    self.camera_topic = 'homie/'+self.camera_topic+'/motionsensor/control/set'
     self.log.info("Settings from %s" % self.etcfname)
     
   def load_settings(self, fn):
     conf = json.load(open(fn))
-    if conf["mqtt_server_ip"]:
-      self.mqtt_server = conf["mqtt_server_ip"]
-    if conf["mqtt_port"]:
-      self.mqtt_port = conf["mqtt_port"]
-    if conf["mqtt_client_name"]:
-      self.mqtt_client_name = conf["mqtt_client_name"]
-    # v3 - Homie, 
-    if conf['homie_device']:
-      self.homie_device = conf['homie_device']
-    if conf['homie_name']:
-      self.homie_name = conf['homie_name']
+
+    self.mqtt_server = conf.get("mqtt_server_ip", "192.168.1.7")
+    self.mqtt_port = conf.get("mqtt_port", 1883)
+    self.mqtt_client_name = conf.get("mqtt_client_name", "trumpy_12")
+    self.homie_device = conf.get('homie_device', "trumpy_bear")
+    self.homie_name = conf.get('homie_name', 'Trumpy Bear Pi3')
+    self.camera_topic = conf.get('camera_topic', 'trumpy_cam')
+    self.mycroft_ip = conf.get('mycroft_ip', '192.168.1.2')
 
 
   def print(self):
@@ -61,6 +61,8 @@ class Settings:
     st['mqtt_client_name'] = self.mqtt_client_name
     st['homie_device'] = self.homie_device 
     st['homie_name'] = self.homie_name
+    st['camera_topic'] = self.camera_topic
+    st['status_topic'] = self.status_topic
     str = json.dumps(st)
     return str
 
