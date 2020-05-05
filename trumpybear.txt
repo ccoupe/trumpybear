@@ -1,5 +1,14 @@
 id = name [and matching pictures], role 
 
+Projects/trumpydb/
+  names.json
+    names = {'cecil': Role.owner, }
+  cecil/
+    front/2020-05-05_10_05_23.jpg
+    face/  "
+    side/  "
+
+
 mycroft skills - awaken, insult
 Hubitat things
   Turn on Light over bear.

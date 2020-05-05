@@ -1,7 +1,8 @@
 # Constants and Enums for TrumpyBear app
 import enum 
+from enum import IntEnum
 
-class Role(enum.Enum): 
+class Role(IntEnum): 
   unknown = 0
   owner = 1
   friend = 2
@@ -17,10 +18,7 @@ class State(enum.Enum):
   waitfr = 3
   waitrecog = 4
   waitsd = 5
-  insult = 6
-  mycroft = 7
-  rasa = 8
-  alarm = 9
+  role_dispatch = 6
 
 class Event(enum.Enum):
   start = 0
@@ -28,5 +26,3 @@ class Event(enum.Enum):
   frpict = 2
   sdpict = 3
   recog = 4
-  timer5s = 5
-  timer5m = 6

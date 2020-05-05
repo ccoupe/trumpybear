@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import paho.mqtt.client as mqtt
-import sys
+import sys, traceback
 import json
 from lib.Constants import Event
 from datetime import datetime
@@ -147,8 +147,9 @@ class Homie_MQTT:
         self.state_machine(Event.reply, payload)
       else:
         self.log.debug("on_message() unknown command %s" % message)
-    except:
-      self.log.error("on_message error: %s" % sys.exc_info()[0])
+    except :
+      traceback.print_exc()
+      #self.log.error("on_message error: %s" % sys.exc_info()[0])
 
     
   def isConnected(self):
