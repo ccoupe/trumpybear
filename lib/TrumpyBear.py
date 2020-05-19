@@ -27,16 +27,23 @@ class TrumpyBear:
    
     self.respell = {"jamis": "janice", 'carrie': 'kerri', 'sea salt': 'cecil',
       'generous': 'janice', 'sisal': 'cecil', 'lynda': 'linda', 'sea': 'cecil',
-      'seesaw': 'cecil', 'cfo': 'cecil'}
+      'seesaw': 'cecil', 'cfo': 'cecil', 'saints': 'cecil'}
     
   
   def check_user(self, st):
-    name = st.split(' ')[0]
     # compare name to the current users
-    self.name = self.respell.get(name, name)
-    role = self.name_to_role.get(self.name, None)
+    role = Role.unknown
+    words =  st.split(' ')
+    for nm in words:
+      nm = self.respell.get(nm, nm)
+      role = self.name_to_role.get(nm, None)
+      if role is not None:
+        self.name = nm
+        break
+
     if role == None:
-      print('new name', name)
+      self.name = words[-1]
+      self.log.info('new name: {}'.format(self.name))
       self.name_to_role[self.name] = Role.unknown
       self.role = Role.unknown
     else:
@@ -44,7 +51,6 @@ class TrumpyBear:
     self.log.info("TrumpyBear thinks {} is a {}".format(self.name, self.role))
     return self.role
     
-  # TODO save, name, front, side
   def save_user(self):
     frontpath = os.path.join(self.db_path, self.name, 'front')
     facepath = os.path.join(self.db_path, self.name, 'face')

@@ -65,6 +65,17 @@ class Homie_MQTT:
     else:
       self.log.debug("Init() Subscribed to %s" % self.hreply_sub)
       
+    # esp32 with display and autoranger
+    self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
+    rc,_ = self.client.subscribe(self.hrgrsub)
+    if rc != mqtt.MQTT_ERR_SUCCESS:
+      self.log.warn("Subscribe failed: %d" %rc)
+    else:
+      self.log.debug("Init() Subscribed to %s" % self.hrgrsub)
+    self.hrgrcmd = 'homie/trumpy_ranger/autoranger/cmd/set'
+    self.hdspcmd = 'homie/trumpy_ranger/display/cmd/set'
+    self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
+      
   def create_topics(self, hdevice, hlname):
     self.log.debug("Begin topic creation")
     # create topic structure at server - these are retained! 
@@ -145,6 +156,8 @@ class Homie_MQTT:
         self.controller(payload)
       elif topic == self.hreply_sub:
         self.state_machine(Event.reply, payload)
+      elif topic == self.hrgrsub:
+        self.state_machine(Event.range)
       else:
         self.log.debug("on_message() unknown command %s" % message)
     except :
@@ -188,4 +201,14 @@ class Homie_MQTT:
     self.client.publish(self.hctl_pub, 'on')
     
   def tts_mute(self):
-   self.client.publish(self.hctl_pub, 'off')
+    self.client.publish(self.hctl_pub, 'off')
+
+  def display_cmd(self, st):
+    self.client.publish(self.hdspcmd, st)
+    
+  def display_text(self, txt):
+    self.client.publish(self.hdsptxt, txt)
+
+  def start_ranger(self, cm):
+    self.client.publish(self.hrgrcmd, cm)
+  

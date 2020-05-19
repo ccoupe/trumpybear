@@ -32,6 +32,8 @@ class Settings:
       self.our_IP = "192.168.1.255"
       self.macAddr = "de:ad:be:ef"
     self.macAddr = self.macAddr.upper()
+    # default config  ~/.trumpybear
+    self.db_path = os.path.join(os.getenv('HOME'),'.trumpybear')
     self.load_settings(self.etcfname)
     self.status_topic = 'homie/'+self.homie_device+'/control/cmd'
     # expand camera_topic
@@ -48,6 +50,7 @@ class Settings:
     self.homie_name = conf.get('homie_name', 'Trumpy Bear Pi3')
     self.camera_topic = conf.get('camera_topic', 'trumpy_cam')
     self.mycroft_ip = conf.get('mycroft_ip', '192.168.1.2')
+    self.db_path = conf.get('db_path', self.db_path)
 
 
   def print(self):
@@ -63,6 +66,7 @@ class Settings:
     st['homie_name'] = self.homie_name
     st['camera_topic'] = self.camera_topic
     st['status_topic'] = self.status_topic
+    st['db_path'] = self.db_path
     str = json.dumps(st)
     return str
 

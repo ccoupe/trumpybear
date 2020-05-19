@@ -14,15 +14,20 @@ class Role(IntEnum):
 class State(enum.Enum): 
   initialized = 0
   starting = 1
-  getname = 2
-  waitfr = 3
-  waitrecog = 4
-  waitsd = 5
-  role_dispatch = 6
+  waitname = 2
+  waitface = 3
+  waitside = 4
+  waitfront = 5
+  waitrecog = 6
+  role_dispatch = 7
+  q1ans = 8
+  q2ans = 9
+  q3ans = 10
 
 class Event(enum.Enum):
-  start = 0
-  reply = 1
-  frpict = 2
-  sdpict = 3
-  recog = 4
+  start = 0   # from mqtt (hubitat)
+  reply = 1   # tts from mycroft
+  pict = 2    # from mqttcamera
+  recog = 3   # from face_recognition server
+  watchdog = 5 # timer fired
+  ranger = 6   # from autoranger device
