@@ -11,9 +11,7 @@ class TrumpyBear:
     self.name = name
     self.role = role
     self.log = settings.log
-    self.front_path = None
     self.face_path = None
-    self.side_path = None
     self.db_path = settings.db_path
     # load the db
     np = os.path.join(self.db_path, 'names.json')
@@ -52,23 +50,13 @@ class TrumpyBear:
     return self.role
     
   def save_user(self):
-    frontpath = os.path.join(self.db_path, self.name, 'front')
     facepath = os.path.join(self.db_path, self.name, 'face')
-    sidepath = os.path.join(self.db_path, self.name, 'side')
-    os.makedirs(frontpath, exist_ok=True)
     os.makedirs(facepath, exist_ok=True)
-    os.makedirs(sidepath, exist_ok=True)
     with open(os.path.join(self.db_path,'names.json'), 'w') as jf:
       json.dump(self.name_to_role, jf)
     now = datetime.now()
     fn = now.strftime("%Y-%m-%d_%H-%M-%S.jpg")
-    shutil.copyfile(self.front_path, os.path.join(frontpath, fn))
-    if self.face_path is None:
-      shutil.copyfile(self.front_path, os.path.join(facepath, fn))
-    else:
-      shutil.copyfile(self.face_path, os.path.join(facepath, fn))
-    if self.side_path is not None:
-      shutil.copyfile(self.side_path, os.path.join(sidepath, fn))
+    shutil.copyfile(self.face_path, os.path.join(facepath, fn))
     self.log.info('pictures saved in {}'.format(self.db_path))
     return
     

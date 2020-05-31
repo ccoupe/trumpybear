@@ -13,15 +13,12 @@ from lib.Settings import Settings
 from lib.Homie_MQTT import Homie_MQTT
 from lib.Constants import State, Event, Role
 from lib.TrumpyBear import TrumpyBear
-
-#from lib.Algo import Algo
 import urllib.request
-#from playsound import playsound
 import logging
 import logging.handlers
-#import numpy as np
-#import cv2
-import websocket
+import numpy as np
+import cv2
+import rpyc
 
 # globals
 settings = None
@@ -31,13 +28,12 @@ isPi = False
 applog = None
 trumpy_state = None
 trumpy_bear = None    # object of class TrumpyBear
-my_tts = None         # object to do TTS: espeak or mycroft, None for quiet mode
-#myc_conn = None       # websocket to mycroft
 sm_lock = Lock()      # state machine lock - only one thread at a time
+face_proxy = None
+waitcnt = 0
 
 def playUrl(url):
   global hmqtt, isPi, applog
-  #log(url)
   applog.info("playUrl: %s" % url)
   if True:
     try:
@@ -46,36 +42,20 @@ def playUrl(url):
       applog.warn("Failed download")
     url = "tmp.mp3"
   #synchronous playback, I believe.
-  hmqtt.set_status("busy")
+  hmqtt.set_status("running")
   if isPi:
     os.system('mpg123 -q --no-control tmp.mp3')
   else:
     playsound(url)
-  hmqtt.set_status("ready")
+  hmqtt.set_status("idle")
 
 def alarmUrl(url):
-  log(url)
-  
-def log(msg, level=2):
-  global debug_level
-  if level > debug_level:
-    return
-  (dt, micro) = datetime.now().strftime('%H:%M:%S.%f').split('.')
-  dt = "%s.%03d" % (dt, int(micro) / 1000)
-  logmsg = "%-14.14s%-60.60s" % (dt, msg)
-  print(logmsg, flush=True)
-  
-def my_speak(text):
-  global hmqtt
-  hmqtt.speak(text)
-  
-def my_ask(text):
-  global hmqtt
-  hmqtt.ask(text)
-  
- 
+  global applog
+  # TODO: write alarm code
+  applog.info(f'alarm: {url}')
+     
 def main():
-  global isPi, settings, hmqtt, applog, my_speak, my_ask
+  global isPi, settings, hmqtt, applog, face_proxy
   # process cmdline arguments
   loglevels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
   ap = argparse.ArgumentParser()
@@ -118,15 +98,25 @@ def main():
   # TODO this should be part of the state machine.
   # set some callback functions in the Mqtt Object
   hmqtt.controller = trumpy_recieve
+  
+  # connect to the face recogition server
+  face_proxy = rpyc.connect(settings.face_server_ip, settings.face_port, 
+          config={'allow_public_attrs': True})
+  # Turn off display
+  hmqtt.display_cmd('off')
   # All we do now is loop over a 5 minute delay
   while True:
     time.sleep(5*60)
 
 
-waitcnt = 0
-
 # The state machine controls the interaction with mycroft(replys),
 # mqttcamera and other events. 
+# BE WATCHFUL about threading
+#  mqtt calls into state_machine() on it's thread. You don't want
+#  to block it with a sleep() if you depend on publishing to mqtt first
+#     I use a hack. 
+#  Most of the sleeps are ad hoc timing to keep mycroft
+#  queue from building since it is LIFO
 def state_machine(evt, arg=None):
   global applog, settings, hmqtt, trumpy_state, trumpy_bear
   global sm_lock, waitcnt
@@ -137,17 +127,20 @@ def state_machine(evt, arg=None):
   next_state = None
   if evt == Event.start:
     trumpy_state = State.starting
-    next_state = State.waitname
+    next_state = State.waitrange
     waitcnt = 0
-    hmqtt.display_text('Trumpy Bear is awake. I see you.')
+    hmqtt.set_status('running')
+    hmqtt.display_text('Trumpy Bear is awake')
     hmqtt.ask('awaken the trumpy bear')
+    hmqtt.ranger_mode(settings.ranger_mode)
+    hmqtt.start_ranger(75)
   elif evt == Event.reply:
     if trumpy_state == State.waitname:
-      # have a name. Maybe. What role matches? 
+      # have a name. Maybe.
       if arg == None or arg == '':
         if waitcnt < 2:
           next_state = State.waitname  # do over
-          hmqtt.speak("I didn't catch that. Move closer and wait for the tone")
+          hmqtt.speak("I didn't catch that. Wait for the tone, Kay?")
           time.sleep(1)
           waitcnt += 1
           hmqtt.ask('awaken the trumpy bear')
@@ -158,12 +151,16 @@ def state_machine(evt, arg=None):
         trumpy_bear = TrumpyBear(settings, arg)
         role = trumpy_bear.check_user(arg)
         # For Testing, force role.unknown
-        role = Role.unknown
+        # role = Role.unknown
         if role == Role.owner:
-          next_state = State.mycroft 
+          hmqtt.speak(f"Verifying {trumpy_bear.name}")
+          hmqtt.display_text(f"Verifying {trumpy_bear.name}")
+          next_state = State.waitface
+          request_picture('face')
         else:
           hmqtt.speak("I'm going to take your picture. Face the bear and stand up straight")
-          time.sleep(1)
+          hmqtt.display_text("Face the Bear")
+          time.sleep(2)
           request_picture('face')
           next_state = State.waitface
           
@@ -176,42 +173,61 @@ def state_machine(evt, arg=None):
       trumpy_bear.ans2 = arg
       next_state = State.q3ans
       hmqtt.ask('do the last chance')
-      hmqtt.display_text("Arming Defenses It's On")
+      hmqtt.display_text("Arming Defenses")
     elif trumpy_state == State.q3ans:
       trumpy_bear.ans3 = arg
-      next_state == State.role_dispatch
+      next_state = State.role_dispatch
       hmqtt.speak("What a Loos-er! Go out the way you came in and Don't touch anything metal!")
+      time.sleep(5)
     else:
       applog.debug('no handler in {} for {}'.format(trumpy_state, evt))
   elif evt == Event.pict:
     if trumpy_state == State.waitface:
-      trumpy_bear.front_path = "/var/www/camera/face.jpg"
+      hmqtt.start_ranger(0);
+      trumpy_bear.face_path = "/var/www/camera/face.jpg"
+      aud_name = trumpy_bear.name
       # recognition is synchronous, not an event
-      name = do_recog(trumpy_bear)
-      # if name != None and Role != unknown then skip other pictures and the like
-      time.sleep(1) # TODO: turn on buzzer? flash an led? Or in request_picture?
-      hmqtt.speak('Click. Done. Please turn right 90 degrees for a side picture.')
-      time.sleep(10)
-      next_state = State.waitside
-      request_picture('side')
-    elif trumpy_state == State.waitside:
-      trumpy_bear.side_path = "/var/www/camera/side.jpg"
+      vis_name = do_recog(trumpy_bear)
+      applog.debug(f'recognized {vis_name} using {aud_name}')
+      if vis_name != None:
+        vis_role = trumpy_bear.check_user(vis_name)
+        if vis_role == Role.owner:
+          trumpy_bear.name = aud_name
+          trumpy_bear.check_user(aud_name)
+        else:
+          # camera overrides lying talkers.
+          trumpy_bear.name = vis_name
+      else:
+        trumpy_bear.role = Role.unknown
       trumpy_bear.save_user()
-      hmqtt.speak('Click Got it ')
+      hmqtt.speak('Click. Got it ')
       # wait for speech to finish
       time.sleep(3)
       if trumpy_bear.role == Role.unknown:
         time.sleep(1)
         next_state = State.q1ans 
-        hmqtt.display_text('You are found wanting')
+        hmqtt.display_text('You are Unknown')
         hmqtt.ask('call the cops')
       else:
         next_state = State.role_dispatch
-        hmqtt.speak('Saved. You are being judged {}'.format(trumpy_bear.name))
+        hmqtt.speak('Your access permissions are being checked, {}'.format(trumpy_bear.name))
         hmqtt.display_text('Hi {}'.format(trumpy_bear.name))
     else:
       applog.debug('no handler in {} for {}'.format(trumpy_state, evt))
-      
+  elif evt == Event.ranger:
+    next_state = trumpy_state
+    rng = int(arg)
+    print(f'ranger stop at {rng}')
+    if rng == 0:
+      # timed out. The perp can't follow instructions
+      next_state = State.role_dispatch
+      trumpy_bear = TrumpyBear(settings, 'perp')
+      hmqtt.speak('I asked nicely. Oh Well. Too Bad');
+    if trumpy_state == State.waitrange:
+      next_state = State.waitname
+
+  elif evt == Event.abort:
+    next_state = State.aborting
   elif evt == Event.ranger:
     pass
   elif evt == Event.watchdog:
@@ -225,6 +241,9 @@ def state_machine(evt, arg=None):
   applog.debug("Sm exit {} {} => {}".format(cur_state, evt, trumpy_state))
   # unlock machine
   sm_lock.release()
+  if trumpy_state == State.aborting:
+    trumpy_state = State.initialized
+    interaction_finished()
   if trumpy_state == State.role_dispatch:
     trumpy_state = State.initialized
     role_dispatch(trumpy_bear)
@@ -237,10 +256,12 @@ def role_dispatch(trumpy_bear):
   elif role == Role.friend or role == Role.aquaintance or role == Role.relative:
     begin_mycroft()
   elif role == Role.owner:
-    hmqtt.speak("You are very annoying {}. Are you with the failing New York Times?".format(trumpy_bear.name))
-    time.sleep(4)
-    hmqtt.ask('What does tronald dump think about hilary clinton')
+    hmqtt.speak("You are very annoying, {}. Are you with the failing New York Times?".format(trumpy_bear.name))
+    #time.sleep(2)
+    #hmqtt.ask('What does tronald dump think about hilary clinton')
     interaction_finished()
+  elif role == Role.unknown:
+    begin_intruder()
   else:
     interaction_finished()
    
@@ -259,38 +280,57 @@ def long_timer(min=5):
 def interaction_finished():
   global hmqtt, warning_level 
   print('closing interaction')
-  hmqtt.speak("Thanks for playing")
   time.sleep(1)
   hmqtt.tts_mute()
   hmqtt.display_cmd('off')
+  hmqtt.set_status('idle')
 
 
 def begin_mycroft():
   global hmqtt
   print('starting mycroft')
-  long_timer(5)
+  long_timer(2)
+  hmqtt.display_text("say 'Hey Mycroft'")
   hmqtt.speak("You can ask questions by saying hey mycroft")
 
 
 def begin_rasa(tb):
   global hmqtt
   print('starting rasa')
+  hmqtt.display_text(f"{tb.name} to see Mr. Sanders")
   #hmqtt.speak("Mister Sanders is not available {}. Try later.".format(tb.name))
   hmqtt.ask('Mister Sanders, {} is here'.format(tb.name))
   time.sleep(1)
   interaction_finished()
       
-# TODO This will be an rpc in the future that returns the matching
-# name string or None.
-def do_recog(sb):
-  print('get_face_name')
-  return None
+def begin_intruder():
+  print('begin intruder')
+  hmqtt.set_status('alarm')  # wakes up hubitat HSM
+  cnt = 0
+  while cnt < 3:
+    print("intruder", cnt)
+    hmqtt.display_text("Panic")
+    hmqtt.loop()
+    time.sleep(1)
+    hmqtt.display_text("Run Away")
+    hmqtt.loop()
+    time.sleep(1)
+    cnt += 1
+  print('exiting intruder')
+  hmqtt.display_cmd('off')
+  hmqtt.tts_mute()
+    
 
+# return name string or None for the picture (path) in 
+# TrumpyBear object.
+def do_recog(tb):
+  global face_proxy
+  print('get_face_name {}'.format(tb.face_path))
+  bfr = open(tb.face_path, 'rb').read()
+  # call remote
+  result = face_proxy.root.face_recog(bfr)
+  return result
 
-def load_pict(path):
-  # TODO
-  print('leaving load_pict')
-  return None
   
 def request_picture(typ):
   global settings, hmqtt, applog
@@ -308,19 +348,19 @@ def wakeup():
   pict_count = 0
   applog.info("Trumpy Bear awakens")
   hmqtt.tts_unmute()
-  hmqtt.speak("Trumpy Bear sees you. . Approach and face the Bear!")
+  hmqtt.speak("Trumpy Bear sees you. Approach and face the Bear!")
   state_machine(Event.start)
   #time.sleep(2)
   hmqtt.client.publish(settings.status_topic, 'awakens')
 
 
-# the command channel controls the 
+# the command channel controls the device from hubitat via mqtt
 def trumpy_recieve(jsonstr):
   global settings, hmqtt, applog, trumpy_bear, trumpy_state
   rargs = json.loads(jsonstr)
   cmd = rargs['cmd']
   if cmd == 'init':
-    # hubitat can send an init, can override camera choice in json
+    # hubitat can send an init, can override camera motion sensor choice in json
     topic = rargs['reply']
     settings.camera_topic = 'homie/'+topic+'/motionsensor/control/set'
     settings.status_topic = 'homie/'+settings.homie_device+'/control/cmd'
@@ -331,10 +371,13 @@ def trumpy_recieve(jsonstr):
     # mosquitto_pub -h pi4 -t homie/trumpy_bear/control/cmd/set -m '{"cmd": "begin"}'
     # wake up TrumpyBear
     wakeup()
+  elif cmd == 'end':
+    # kill and reset
+    state_machine(Event.abort)
   elif cmd == 'capture_done':
     state_machine(Event.pict)
   elif cmd == 'alarm':
-    #my_tts(rargs['text'])
+    #TODO not needed? my_tts(rargs['text'])
     pass
   
 

@@ -5,5 +5,6 @@
   "homie_device": "trumpy_bear",
   "homie_name": "Trumpy Bear Pi3",
   "camera_topic": "trumpy_cam",
-  "mycroft_ip": "192.168.1.8"
+  "mycroft_ip": "192.168.1.8",
+  "ranger_mode": "once"
 }

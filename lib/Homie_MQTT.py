@@ -72,7 +72,8 @@ class Homie_MQTT:
       self.log.warn("Subscribe failed: %d" %rc)
     else:
       self.log.debug("Init() Subscribed to %s" % self.hrgrsub)
-    self.hrgrcmd = 'homie/trumpy_ranger/autoranger/cmd/set'
+    self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
+    self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
     self.hdspcmd = 'homie/trumpy_ranger/display/cmd/set'
     self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
       
@@ -82,7 +83,7 @@ class Homie_MQTT:
     #self.client.publish("homie/"+hdevice+"/$homie", "3.0.1", mqos, retain=True)
     self.publish_structure("homie/"+hdevice+"/$homie", "3.0.1")
     self.publish_structure("homie/"+hdevice+"/$name", hlname)
-    self.publish_structure(self.state_pub, "ready")
+    self.publish_structure(self.state_pub, "idle")
     self.publish_structure("homie/"+hdevice+"/$mac", self.settings.macAddr)
     self.publish_structure("homie/"+hdevice+"/$localip", self.settings.our_IP)
     # could have two nodes, player and alarm
@@ -157,7 +158,7 @@ class Homie_MQTT:
       elif topic == self.hreply_sub:
         self.state_machine(Event.reply, payload)
       elif topic == self.hrgrsub:
-        self.state_machine(Event.range)
+        self.state_machine(Event.ranger, payload)
       else:
         self.log.debug("on_message() unknown command %s" % message)
     except :
@@ -191,6 +192,7 @@ class Homie_MQTT:
   def set_status(self, str):
     self.client.publish(self.state_pub, str)
         
+  # these use the bridge to talk to mycroft
   def speak(self, str):
     self.client.publish(self.hsay_pub, str)
 
@@ -203,6 +205,7 @@ class Homie_MQTT:
   def tts_mute(self):
     self.client.publish(self.hctl_pub, 'off')
 
+  # these talk to the trumpy_ranger device/node
   def display_cmd(self, st):
     self.client.publish(self.hdspcmd, st)
     
@@ -210,5 +213,12 @@ class Homie_MQTT:
     self.client.publish(self.hdsptxt, txt)
 
   def start_ranger(self, cm):
-    self.client.publish(self.hrgrcmd, cm)
+    self.client.publish(self.hrgrdist, cm)
+    
+  def ranger_mode(self, str):
+    self.client.publish(self.hrgrmode, str)
+    
+  # consider this a hack - it probably shouldn't work but it does.
+  def loop(self):
+    self.client.loop()
   

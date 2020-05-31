@@ -23,6 +23,8 @@ class State(enum.Enum):
   q1ans = 8
   q2ans = 9
   q3ans = 10
+  aborting = 11
+  waitrange = 12
 
 class Event(enum.Enum):
   start = 0   # from mqtt (hubitat)
@@ -31,3 +33,4 @@ class Event(enum.Enum):
   recog = 3   # from face_recognition server
   watchdog = 5 # timer fired
   ranger = 6   # from autoranger device
+  abort = 7   # from mqtt (hubitat)

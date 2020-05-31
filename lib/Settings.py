@@ -50,7 +50,10 @@ class Settings:
     self.homie_name = conf.get('homie_name', 'Trumpy Bear Pi3')
     self.camera_topic = conf.get('camera_topic', 'trumpy_cam')
     self.mycroft_ip = conf.get('mycroft_ip', '192.168.1.2')
+    self.face_server_ip = conf.get('face_server_ip', '192.168.1.4')
+    self.face_port = conf.get('face_port', 4774)
     self.db_path = conf.get('db_path', self.db_path)
+    self.ranger_mode = conf.get('ranger_mode', 'once')
 
 
   def print(self):
@@ -66,7 +69,12 @@ class Settings:
     st['homie_name'] = self.homie_name
     st['camera_topic'] = self.camera_topic
     st['status_topic'] = self.status_topic
+    st['mycroft_ip'] = self.mycroft_ip
+    st['face_server_ip'] = self.face_server_ip
+    st['face_port'] = self.face_port
     st['db_path'] = self.db_path
+    st['ranger_mode'] = self.ranger_mode
+
     str = json.dumps(st)
     return str
 
