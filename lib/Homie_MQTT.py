@@ -74,7 +74,7 @@ class Homie_MQTT:
       self.log.debug("Init() Subscribed to %s" % self.hrgrsub)
     self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
     self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
-    self.hdspcmd = 'homie/trumpy_ranger/display/cmd/set'
+    self.hdspcmd = 'homie/trumpy_ranger/display/mode/set'
     self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
       
   def create_topics(self, hdevice, hlname):

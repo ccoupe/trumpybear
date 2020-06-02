@@ -168,7 +168,7 @@ def state_machine(evt, arg=None):
       trumpy_bear.ans1 = arg
       next_state = State.q2ans
       hmqtt.ask("arm defenses")
-      hmqtt.display_text('dialing.. dialing..')
+      hmqtt.display_text('dialing.. connected')
     elif trumpy_state == State.q2ans:
       trumpy_bear.ans2 = arg
       next_state = State.q3ans
@@ -282,8 +282,11 @@ def interaction_finished():
   print('closing interaction')
   time.sleep(1)
   hmqtt.tts_mute()
+  hmqtt.loop()
   hmqtt.display_cmd('off')
+  hmqtt.loop()
   hmqtt.set_status('idle')
+  hmqtt.loop()
 
 
 def begin_mycroft():
@@ -291,7 +294,9 @@ def begin_mycroft():
   print('starting mycroft')
   long_timer(2)
   hmqtt.display_text("say 'Hey Mycroft'")
+  hmqtt.loop()
   hmqtt.speak("You can ask questions by saying hey mycroft")
+  hmqtt.loop()
 
 
 def begin_rasa(tb):
@@ -300,6 +305,7 @@ def begin_rasa(tb):
   hmqtt.display_text(f"{tb.name} to see Mr. Sanders")
   #hmqtt.speak("Mister Sanders is not available {}. Try later.".format(tb.name))
   hmqtt.ask('Mister Sanders, {} is here'.format(tb.name))
+  hmqtt.loop()
   time.sleep(1)
   interaction_finished()
       
@@ -318,7 +324,9 @@ def begin_intruder():
     cnt += 1
   print('exiting intruder')
   hmqtt.display_cmd('off')
+  hmqtt.loop()
   hmqtt.tts_mute()
+  hmqtt.loop()
     
 
 # return name string or None for the picture (path) in 
