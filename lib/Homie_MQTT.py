@@ -10,11 +10,13 @@ import time
 
 class Homie_MQTT:
 
-  def __init__(self, settings, playCb, alarmCb, sm):
+  def __init__(self, settings, playCb, chimesCb, sirenCb, strobeCb, sm):
     self.settings = settings
     self.log = settings.log
     self.playCb = playCb
-    self.alarmCb = alarmCb
+    self.chimesCb = chimesCb
+    self.sirenCb = sirenCb
+    self.strobeCb = strobeCb
     self.controller = None
     self.state_machine = sm
     
@@ -43,35 +45,26 @@ class Homie_MQTT:
     self.hsay_pub = "homie/"+hdevice+"/speech/say/set"
     self.hask_pub = "homie/"+hdevice+"/speech/ask/set"
     self.hctl_pub = "homie/"+hdevice+"/speech/ctl/set"
+    # TODO: HARD CODED is evil and it's not Homie compat:
+    self.hEnbl_pub = "homie/trumpy_enable/switch/state"
+    self.hCops_pub = "homie/trumpy_cops/switch/state"
+    # newer device nodes to listen on
+    self.hchime_sub = "homie/"+hdevice+"/chime/state/set"
+    self.hsiren_sub = "homie/"+hdevice+"/siren/state/set"
+    self.hstrobe_sub = "homie/"+hdevice+"/strobe/state/set"
+    # esp32 with display and autoranger
+    self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
 
     self.log.debug("Homie_MQTT __init__")
     self.create_topics(hdevice, hlname)
-    
-    rc,_ = self.client.subscribe(self.hurl_sub)
-    if rc != mqtt.MQTT_ERR_SUCCESS:
-      self.log.warn("Subscribe failed: %d" %rc)
-    else:
-      self.log.debug("Init() Subscribed to %s" % self.hurl_sub)
+    for sub in [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hchime_sub,
+        self.hsiren_sub, self.hstrobe_sub, self.hrgrsub]:
+      rc,_ = self.client.subscribe(sub)
+      if rc != mqtt.MQTT_ERR_SUCCESS:
+        self.log.warn(f"Subscribe to {sub} failed: {rc}")
+      else:
+        self.log.debug(f"Init() Subscribed to{sub}") 
 
-    rc,_ = self.client.subscribe(self.hcmd_sub)
-    if rc != mqtt.MQTT_ERR_SUCCESS:
-      self.log.warn("Subscribe failed: %d" %rc)
-    else:
-      self.log.debug("Init() Subscribed to %s" % self.hcmd_sub)
-      
-    rc,_ = self.client.subscribe(self.hreply_sub)
-    if rc != mqtt.MQTT_ERR_SUCCESS:
-      self.log.warn("Subscribe failed: %d" %rc)
-    else:
-      self.log.debug("Init() Subscribed to %s" % self.hreply_sub)
-      
-    # esp32 with display and autoranger
-    self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
-    rc,_ = self.client.subscribe(self.hrgrsub)
-    if rc != mqtt.MQTT_ERR_SUCCESS:
-      self.log.warn("Subscribe failed: %d" %rc)
-    else:
-      self.log.debug("Init() Subscribed to %s" % self.hrgrsub)
     self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
     self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
     self.hdspcmd = 'homie/trumpy_ranger/display/mode/set'
@@ -87,7 +80,7 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/$mac", self.settings.macAddr)
     self.publish_structure("homie/"+hdevice+"/$localip", self.settings.our_IP)
     # could have two nodes, player and alarm
-    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, speech")
+    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, speech, chime, siren, strobe")
     
     # player node
     self.publish_structure("homie/"+hdevice+"/player/$name", hlname)
@@ -133,6 +126,36 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/speech/ctl/$datatype", "string")
     self.publish_structure("homie/"+hdevice+"/speech/ctl/$settable", "true")
     self.publish_structure("homie/"+hdevice+"/speech/ctl/$retained", "true")
+
+    # siren node
+    self.publish_structure("homie/"+hdevice+"/siren/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/siren/$type", "siren")
+    self.publish_structure("homie/"+hdevice+"/siren/$properties","state")
+    #  'state' Property of 'siren'
+    self.publish_structure("homie/"+hdevice+"/siren/state/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/siren/state/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/siren/state/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/siren/state/$retained", "true")
+    
+    # chime node
+    self.publish_structure("homie/"+hdevice+"/chime/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/chime/$type", "chime")
+    self.publish_structure("homie/"+hdevice+"/chime/$properties","state")
+    #  'state' Property of 'siren'
+    self.publish_structure("homie/"+hdevice+"/chime/state/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/chime/state/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/chime/state/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/chime/state/$retained", "true")
+
+    # strobe node
+    self.publish_structure("homie/"+hdevice+"/strobe/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/strobe/$type", "strobe")
+    self.publish_structure("homie/"+hdevice+"/strobe/$properties","state")
+    #  'state' Property of 'strobe'
+    self.publish_structure("homie/"+hdevice+"/strobe/state/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/strobe/state/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/strobe/state/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/strobe/state/$retained", "true")
    # Done with structure. 
 
     self.log.debug("homie topics created")
@@ -159,6 +182,13 @@ class Homie_MQTT:
         self.state_machine(Event.reply, payload)
       elif topic == self.hrgrsub:
         self.state_machine(Event.ranger, payload)
+      elif topic == self.hchime_sub:
+        self.chimeCb(payload)
+      elif topic == self.hsiren_sub:
+        self.sirenCb(payload)
+        self.log.debug("back from sirenCb")
+      elif topic == self.hstrobe_sub:
+        self.strobeCb(payload)
       else:
         self.log.debug("on_message() unknown command %s" % message)
     except :
@@ -217,6 +247,12 @@ class Homie_MQTT:
     
   def ranger_mode(self, str):
     self.client.publish(self.hrgrmode, str)
+    
+  def enable_player(self):
+    self.client.publish(self.hEnbl_pub, "on")
+    
+  def enable_cops(self):
+    self.client.publish(self.hCops_pub, "on")
     
   # consider this a hack - it probably shouldn't work but it does.
   def loop(self):

@@ -6,7 +6,7 @@ import argparse
 import warnings
 from datetime import datetime
 import time, threading, sched
-from threading import Lock
+from threading import Lock, Thread
 import socket
 import os
 from lib.Settings import Settings
@@ -47,13 +47,61 @@ def playUrl(url):
     os.system('mpg123 -q --no-control tmp.mp3')
   else:
     playsound(url)
-  hmqtt.set_status("idle")
+  hmqtt.set_status("ready")
+  hmqtt.client.loop()
+  
+def chimesCb(str):
+  global hmqtt, isPi, applog
+  hmqtt.set_status("busy")
+  hmqtt.client.loop()
+  if msg != 'stop':
+    # parse name out of msg ex: '11 - Enjoy'
+    flds = msg.split('-')
+    num = int(flds[0].strip())
+    nm = flds[1].strip()
+    ext = '.mp3'
+    applog.info(f'asked for {msg} => chimes/{nm}{ext}')
+    if isPi:
+      os.system(f'mpg123 -q --no-control chimes/{nm}{ext}')
+    else:
+      playsound(f'chimes/{nm}{ext}')
+  # stop doesn't work/do anything
+  hmqtt.set_status("ready")
+  hmqtt.client.loop()
+  
+playSiren = False
 
-def alarmUrl(url):
-  global applog
-  # TODO: write alarm code
-  applog.info(f'alarm: {url}')
-     
+def playLoop():
+  global playSiren, isPi, hmqtt, applog
+  applog.debug("in thread, playing")
+  while playSiren == True:
+    if isPi:
+      os.system('mpg123 -q --no-control chimes/Horn.mp3')
+    else:
+      playsound('chimes/Siren.mp3')
+
+def sirenCb(msg):
+  global applog, isPi, hmqtt, playSiren
+  playSiren = False
+  thr = None
+  applog.info(f'alarm: {msg}')
+  if msg == 'off':
+    playSiren = False
+    hmqtt.set_status("ready")
+    raise('bad times')
+    thr.join()
+  else:
+    hmqtt.set_status("busy")
+    playSiren = True
+    thr = Thread(target=playLoop)
+    thr.start()
+    
+# TODO: order Lasers with rotating/pan motors. ;-)       
+def strobeCb(msg):
+  global applog, isPi, hmqtt
+  applog.info(f'missing lasers for strobe: {msg}')
+
+  
 def main():
   global isPi, settings, hmqtt, applog, face_proxy
   # process cmdline arguments
@@ -91,12 +139,14 @@ def main():
                       applog)
   hmqtt = Homie_MQTT(settings, 
                     playUrl,
-                    alarmUrl,
+                    chimesCb,
+                    sirenCb,
+                    strobeCb,
                     state_machine)
   settings.print()
     
-  # TODO this should be part of the state machine.
-  # set some callback functions in the Mqtt Object
+  # TODO: minus style points here
+  # set another callback function in the Mqtt Object for the TB state machine
   hmqtt.controller = trumpy_recieve
   
   # connect to the face recogition server
@@ -311,7 +361,8 @@ def begin_rasa(tb):
       
 def begin_intruder():
   print('begin intruder')
-  hmqtt.set_status('alarm')  # wakes up hubitat HSM
+  hmqtt.enable_player()      # sets mqtt switch to wake up a RM rule
+  #hmqtt.set_status('alarm') 
   cnt = 0
   while cnt < 3:
     print("intruder", cnt)
