@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+#
+# Trumpybear is multi-threaded. MQTT message handler will run code in
+# this file under a different thread. The siren/alarm are rentrant since
+# they can be stopped by another thread (mqtt message)
 import paho.mqtt.client as mqtt
 import sys
 import json
@@ -9,6 +13,7 @@ import time, threading, sched
 from threading import Lock, Thread
 import socket
 import os
+from subprocess import Popen
 from lib.Settings import Settings
 from lib.Homie_MQTT import Homie_MQTT
 from lib.Constants import State, Event, Role
@@ -32,6 +37,7 @@ sm_lock = Lock()      # state machine lock - only one thread at a time
 face_proxy = None
 waitcnt = 0
 
+
 def playUrl(url):
   global hmqtt, isPi, applog
   applog.info("playUrl: %s" % url)
@@ -41,65 +47,86 @@ def playUrl(url):
     except:
       applog.warn("Failed download")
     url = "tmp.mp3"
-  #synchronous playback, I believe.
-  hmqtt.set_status("running")
-  if isPi:
-    os.system('mpg123 -q --no-control tmp.mp3')
-  else:
-    playsound(url)
+  #synchronous playback
+  hmqtt.set_status("busy")
+  os.system('mpg123 -q --no-control tmp.mp3')
   hmqtt.set_status("ready")
   hmqtt.client.loop()
   
-def chimesCb(str):
-  global hmqtt, isPi, applog
-  hmqtt.set_status("busy")
-  hmqtt.client.loop()
-  if msg != 'stop':
-    # parse name out of msg ex: '11 - Enjoy'
+# in order to kill a subprocess running mpg123 (in this case)
+# we need a Popen object. I want a Shell too. 
+playSiren = False
+sirenThread = None
+siren_obj = None
+
+def siren_loop(fn):
+  global playSiren, isPi, hmqtt, applog, siren_obj
+  while True:
+    if playSiren == False:
+      break
+    cmd = f'mpg123 -q --no-control chimes/{fn}'
+    siren_obj = Popen('exec ' + cmd, shell=True)
+    siren_obj.wait()
+
+def sirenCb(msg):
+  global applog, isPi, hmqtt, playSiren, sirenThread, siren_obj
+  if msg == 'off':
+    if playSiren == False:
+      return
+    playSiren = False
+    hmqtt.set_status("ready")
+    applog.info("killing siren")
+    siren_obj.terminate()
+  else:
+    if msg == 'on':
+      fn = 'Siren.mp3'
+    else:
+      fn = msg
+    applog.info(f'play siren: {fn}')
+    hmqtt.set_status("busy")
+    playSiren = True
+    siren_loop(fn)
+    #sirenThread = Thread(target=siren_loop, args=(fn,))
+    #sirenThread.start()
+
+
+play_chime = False
+#chime_thread = None
+chime_obj = None
+
+def chime_mp3(fp):
+  global chime_obj, applog
+  cmd = f'mpg123 -q --no-control {fp}'
+  chime_obj = Popen('exec ' + cmd, shell=True)
+  chime_obj.wait()
+
+def chimeCb(msg):
+  global applog, _obj, play_chime
+  if msg == 'off':
+    if play_chime != True:
+      return
+    play_chime = False
+    hmqtt.set_status("ready")
+    applog.info("killing chime")
+    chime_obj.terminate()
+  else:
     flds = msg.split('-')
     num = int(flds[0].strip())
     nm = flds[1].strip()
-    ext = '.mp3'
-    applog.info(f'asked for {msg} => chimes/{nm}{ext}')
-    if isPi:
-      os.system(f'mpg123 -q --no-control chimes/{nm}{ext}')
-    else:
-      playsound(f'chimes/{nm}{ext}')
-  # stop doesn't work/do anything
-  hmqtt.set_status("ready")
-  hmqtt.client.loop()
-  
-playSiren = False
-
-def playLoop():
-  global playSiren, isPi, hmqtt, applog
-  applog.debug("in thread, playing")
-  while playSiren == True:
-    if isPi:
-      os.system('mpg123 -q --no-control chimes/Horn.mp3')
-    else:
-      playsound('chimes/Siren.mp3')
-
-def sirenCb(msg):
-  global applog, isPi, hmqtt, playSiren
-  playSiren = False
-  thr = None
-  applog.info(f'alarm: {msg}')
-  if msg == 'off':
-    playSiren = False
-    hmqtt.set_status("ready")
-    raise('bad times')
-    thr.join()
-  else:
+    fn = 'chimes/' + nm + '.mp3'
+    applog.info(f'play chime: {fn}')
     hmqtt.set_status("busy")
-    playSiren = True
-    thr = Thread(target=playLoop)
-    thr.start()
+    play_chime = True
+    chime_mp3(fn)
+    #chime_thread = Thread(target=chime_mp3, args=(fn,))
+    #chime_thread.start()
+
+  
     
 # TODO: order Lasers with rotating/pan motors. ;-)       
 def strobeCb(msg):
   global applog, isPi, hmqtt
-  applog.info(f'missing lasers for strobe: {msg}')
+  applog.info(f'missing lasers for strobe {msg} Cheapskate!')
 
   
 def main():
@@ -139,7 +166,7 @@ def main():
                       applog)
   hmqtt = Homie_MQTT(settings, 
                     playUrl,
-                    chimesCb,
+                    chimeCb,
                     sirenCb,
                     strobeCb,
                     state_machine)
@@ -169,7 +196,7 @@ def main():
 #  queue from building since it is LIFO
 def state_machine(evt, arg=None):
   global applog, settings, hmqtt, trumpy_state, trumpy_bear
-  global sm_lock, waitcnt
+  global sm_lock, waitcnt, playSiren
   applog.debug("Sm entry {} {}".format(trumpy_state, evt))
   cur_state = trumpy_state
   # lock machine
@@ -292,6 +319,9 @@ def state_machine(evt, arg=None):
   # unlock machine
   sm_lock.release()
   if trumpy_state == State.aborting:
+    #if playSiren == True:
+    #  applog.debug("siren active, killing")
+    #  sirenCb('off')
     trumpy_state = State.initialized
     interaction_finished()
   if trumpy_state == State.role_dispatch:
@@ -332,11 +362,11 @@ def interaction_finished():
   print('closing interaction')
   time.sleep(1)
   hmqtt.tts_mute()
-  hmqtt.loop()
+  #hmqtt.loop()
   hmqtt.display_cmd('off')
-  hmqtt.loop()
+  #hmqtt.loop()
   hmqtt.set_status('idle')
-  hmqtt.loop()
+  #hmqtt.loop()
 
 
 def begin_mycroft():

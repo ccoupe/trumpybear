@@ -4,17 +4,18 @@ import sys, traceback
 import json
 from lib.Constants import Event
 from datetime import datetime
-import time,threading, sched
+import time
+from threading import Thread
 
 import time
 
 class Homie_MQTT:
 
-  def __init__(self, settings, playCb, chimesCb, sirenCb, strobeCb, sm):
+  def __init__(self, settings, playCb, chimeCb, sirenCb, strobeCb, sm):
     self.settings = settings
     self.log = settings.log
     self.playCb = playCb
-    self.chimesCb = chimesCb
+    self.chimeCb = chimeCb
     self.sirenCb = sirenCb
     self.strobeCb = strobeCb
     self.controller = None
@@ -41,10 +42,10 @@ class Homie_MQTT:
     self.hurl_sub = "homie/"+hdevice+"/player/url/set"
     self.state_pub = "homie/"+hdevice+"/$state"
     self.hcmd_sub = "homie/"+hdevice+"/control/cmd/set"
-    self.hreply_sub = "homie/"+hdevice+"/speech/reply/set"
-    self.hsay_pub = "homie/"+hdevice+"/speech/say/set"
-    self.hask_pub = "homie/"+hdevice+"/speech/ask/set"
-    self.hctl_pub = "homie/"+hdevice+"/speech/ctl/set"
+    self.hreply_sub = "homie/"+hdevice+"/tts/reply/set"
+    self.hsay_pub = "homie/"+hdevice+"/tts/say/set"
+    self.hask_pub = "homie/"+hdevice+"/tts/ask/set"
+    self.hctl_pub = "homie/"+hdevice+"/tts/ctl/set"
     # TODO: HARD CODED is evil and it's not Homie compat:
     self.hEnbl_pub = "homie/trumpy_enable/switch/state"
     self.hCops_pub = "homie/trumpy_cops/switch/state"
@@ -80,7 +81,7 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/$mac", self.settings.macAddr)
     self.publish_structure("homie/"+hdevice+"/$localip", self.settings.our_IP)
     # could have two nodes, player and alarm
-    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, speech, chime, siren, strobe")
+    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, tts, chime, siren, strobe")
     
     # player node
     self.publish_structure("homie/"+hdevice+"/player/$name", hlname)
@@ -102,30 +103,30 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/control/cmd/$settable", "true")
     self.publish_structure("homie/"+hdevice+"/control/cmd/$retained", "true")
 
-    # speech node
-    self.publish_structure("homie/"+hdevice+"/speech/$name", hlname)
-    self.publish_structure("homie/"+hdevice+"/speech/$type", "speech")
-    self.publish_structure("homie/"+hdevice+"/speech/$properties","say,ask,reply,ctl")
-    #  'say' Property of 'speech'
-    self.publish_structure("homie/"+hdevice+"/speech/say/$name", hlname)
-    self.publish_structure("homie/"+hdevice+"/speech/say/$datatype", "string")
-    self.publish_structure("homie/"+hdevice+"/speech/say/$settable", "true")
-    self.publish_structure("homie/"+hdevice+"/speech/say/$retained", "true")
-    #  'ask' Property of 'speech'
-    self.publish_structure("homie/"+hdevice+"/speech/ask/$name", hlname)
-    self.publish_structure("homie/"+hdevice+"/speech/ask/$datatype", "string")
-    self.publish_structure("homie/"+hdevice+"/speech/ask/$settable", "true")
-    self.publish_structure("homie/"+hdevice+"/speech/ask/$retained", "true")
-    #  'reply' Property of 'speech'
-    self.publish_structure("homie/"+hdevice+"/speech/reply/$name", hlname)
-    self.publish_structure("homie/"+hdevice+"/speech/reply/$datatype", "string")
-    self.publish_structure("homie/"+hdevice+"/speech/reply/$settable", "true")
-    self.publish_structure("homie/"+hdevice+"/speech/reply/$retained", "true")
-    #  'ctl' Property of 'speech'
-    self.publish_structure("homie/"+hdevice+"/speech/ctl/$name", hlname)
-    self.publish_structure("homie/"+hdevice+"/speech/ctl/$datatype", "string")
-    self.publish_structure("homie/"+hdevice+"/speech/ctl/$settable", "true")
-    self.publish_structure("homie/"+hdevice+"/speech/ctl/$retained", "true")
+    # tts node
+    self.publish_structure("homie/"+hdevice+"/tts/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/tts/$type", "tts")
+    self.publish_structure("homie/"+hdevice+"/tts/$properties","say,ask,reply,ctl")
+    #  'say' Property of 'tts'
+    self.publish_structure("homie/"+hdevice+"/tts/say/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/tts/say/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/tts/say/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/tts/say/$retained", "true")
+    #  'ask' Property of 'tts'
+    self.publish_structure("homie/"+hdevice+"/tts/ask/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/tts/ask/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/tts/ask/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/tts/ask/$retained", "true")
+    #  'reply' Property of 'tts'
+    self.publish_structure("homie/"+hdevice+"/tts/reply/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/tts/reply/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/tts/reply/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/tts/reply/$retained", "true")
+    #  'ctl' Property of 'tts'
+    self.publish_structure("homie/"+hdevice+"/tts/ctl/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/tts/ctl/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/tts/ctl/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/tts/ctl/$retained", "true")
 
     # siren node
     self.publish_structure("homie/"+hdevice+"/siren/$name", hlname)
@@ -183,10 +184,13 @@ class Homie_MQTT:
       elif topic == self.hrgrsub:
         self.state_machine(Event.ranger, payload)
       elif topic == self.hchime_sub:
-        self.chimeCb(payload)
+        chime_thr = Thread(target=self.chimeCb, args=(payload,))
+        chime_thr.start()
+        #self.chimeCb(payload)
       elif topic == self.hsiren_sub:
-        self.sirenCb(payload)
-        self.log.debug("back from sirenCb")
+        siren_thr = Thread(target=self.sirenCb, args=(payload,))
+        siren_thr.start()
+        #self.sirenCb(payload)
       elif topic == self.hstrobe_sub:
         self.strobeCb(payload)
       else:
