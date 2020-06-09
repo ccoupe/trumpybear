@@ -51,7 +51,7 @@ def playUrl(url):
   hmqtt.set_status("busy")
   os.system('mpg123 -q --no-control tmp.mp3')
   hmqtt.set_status("ready")
-  hmqtt.client.loop()
+  #hmqtt.client.loop()
   
 # in order to kill a subprocess running mpg123 (in this case)
 # we need a Popen object. I want a Shell too. 
@@ -232,30 +232,47 @@ def state_machine(evt, arg=None):
         if role == Role.owner:
           hmqtt.speak(f"Verifying {trumpy_bear.name}")
           hmqtt.display_text(f"Verifying {trumpy_bear.name}")
-          next_state = State.waitface
-          request_picture('face')
         else:
           hmqtt.speak("I'm going to take your picture. Face the bear and stand up straight")
           hmqtt.display_text("Face the Bear")
           time.sleep(2)
-          request_picture('face')
-          next_state = State.waitface
+        next_state = State.waitface
+        request_picture('face')
           
     elif trumpy_state == State.q1ans:
       trumpy_bear.ans1 = arg
       next_state = State.q2ans
       hmqtt.ask("arm defenses")
-      hmqtt.display_text('dialing.. connected')
+      hmqtt.display_text('dialing..')
+      time.sleep(1.0)
+      hmqtt.display_text('connected..')
+      time.sleep(1.0)
+      hmqtt.display_text('On Their way')
     elif trumpy_state == State.q2ans:
       trumpy_bear.ans2 = arg
       next_state = State.q3ans
-      hmqtt.ask('do the last chance')
+      hmqtt.ask('happy egrets')
+      time.sleep(2)
       hmqtt.display_text("Arming Defenses")
     elif trumpy_state == State.q3ans:
       trumpy_bear.ans3 = arg
-      next_state = State.role_dispatch
-      hmqtt.speak("What a Loos-er! Go out the way you came in and Don't touch anything metal!")
-      time.sleep(5)
+      next_state = State.q4ans
+      hmqtt.ask("bring out the terrapins")
+      time.sleep(2)
+      hmqtt.display_text('Story or Talk?')
+    elif trumpy_state == State.q4ans:
+      applog.debug(f"answered {arg}")
+      if arg == 'talk':
+        # TODO: start mycroft or rasa for origin story
+        next_state = State,role_dispatch
+      elif arg == 'music' or arg == None:
+        # leave the state_machine cycle
+        next_state = State,role_dispatch
+      elif arg == 'quit':
+        trumpy_bear.role = Role.owner
+        next_state = State,role_dispatch
+      else:
+        next_state = State,role_dispatch
     else:
       applog.debug('no handler in {} for {}'.format(trumpy_state, evt))
   elif evt == Event.pict:
@@ -357,27 +374,20 @@ def long_timer(min=5):
   timerl_thread = threading.Timer(min * 60, long_timer_fired)
   timerl_thread.start()
 
+# called directly or via long_timer()
 def interaction_finished():
   global hmqtt, warning_level 
   print('closing interaction')
-  time.sleep(1)
   hmqtt.tts_mute()
-  #hmqtt.loop()
   hmqtt.display_cmd('off')
-  #hmqtt.loop()
   hmqtt.set_status('idle')
-  #hmqtt.loop()
-
 
 def begin_mycroft():
   global hmqtt
   print('starting mycroft')
   long_timer(2)
   hmqtt.display_text("say 'Hey Mycroft'")
-  hmqtt.loop()
   hmqtt.speak("You can ask questions by saying hey mycroft")
-  hmqtt.loop()
-
 
 def begin_rasa(tb):
   global hmqtt
@@ -385,7 +395,6 @@ def begin_rasa(tb):
   hmqtt.display_text(f"{tb.name} to see Mr. Sanders")
   #hmqtt.speak("Mister Sanders is not available {}. Try later.".format(tb.name))
   hmqtt.ask('Mister Sanders, {} is here'.format(tb.name))
-  hmqtt.loop()
   time.sleep(1)
   interaction_finished()
       
@@ -394,20 +403,17 @@ def begin_intruder():
   hmqtt.enable_player()      # sets mqtt switch to wake up a RM rule
   #hmqtt.set_status('alarm') 
   cnt = 0
-  while cnt < 3:
+  while cnt < 31:
     print("intruder", cnt)
-    hmqtt.display_text("Panic")
-    hmqtt.loop()
+    hmqtt.display_text("Hands Up")
     time.sleep(1)
-    hmqtt.display_text("Run Away")
-    hmqtt.loop()
+    hmqtt.display_text("Don't Shoot")
     time.sleep(1)
     cnt += 1
   print('exiting intruder')
-  hmqtt.display_cmd('off')
-  hmqtt.loop()
-  hmqtt.tts_mute()
-  hmqtt.loop()
+  long_timer(2)
+
+
     
 
 # return name string or None for the picture (path) in 

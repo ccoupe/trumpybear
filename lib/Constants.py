@@ -25,6 +25,7 @@ class State(enum.Enum):
   q3ans = 10
   aborting = 11
   waitrange = 12
+  q4ans = 13
 
 class Event(enum.Enum):
   start = 0   # from mqtt (hubitat)
