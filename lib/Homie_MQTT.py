@@ -81,7 +81,7 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/$mac", self.settings.macAddr)
     self.publish_structure("homie/"+hdevice+"/$localip", self.settings.our_IP)
     # could have two nodes, player and alarm
-    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, tts, chime, siren, strobe")
+    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, speech, chime, siren, strobe")
     
     # player node
     self.publish_structure("homie/"+hdevice+"/player/$name", hlname)
@@ -184,7 +184,6 @@ class Homie_MQTT:
         tb_thr.start()
         #self.controller(payload)
       elif topic == self.hreply_sub:
-        self.log.debug("starting reply thread")
         rp_thr = Thread(target=self.state_machine, args=(Event.reply, payload))
         rp_thr.start()
         #self.state_machine(Event.reply, payload)

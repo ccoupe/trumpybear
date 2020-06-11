@@ -212,9 +212,19 @@ def state_machine(evt, arg=None):
     hmqtt.ranger_mode(settings.ranger_mode)
     hmqtt.start_ranger(75)
   elif evt == Event.reply:
-    if trumpy_state == State.waitname:
+    if arg != None:
+      flds = arg.split('=')
+      ans_typ = flds[0]
+      if len(flds) == 2: arg = flds[1]
+    else:
+      applog.warn("null arg")
+    if trumpy_state == State.aborting:
+      # This can happen when the switch is turned off and mycroft is
+      # interacting (publishing to reply/set)
+      next_state = State.aborting
+    elif trumpy_state == State.waitname:
       # have a name. Maybe.
-      if arg == None or arg == '':
+      if arg == None or arg == '':   
         if waitcnt < 2:
           next_state = State.waitname  # do over
           hmqtt.speak("I didn't catch that. Wait for the tone, Kay?")
@@ -238,41 +248,36 @@ def state_machine(evt, arg=None):
           time.sleep(2)
         next_state = State.waitface
         request_picture('face')
-          
-    elif trumpy_state == State.q1ans:
-      trumpy_bear.ans1 = arg
-      next_state = State.q2ans
-      hmqtt.ask("arm defenses")
-      hmqtt.display_text('dialing..')
-      time.sleep(1.0)
-      hmqtt.display_text('connected..')
-      time.sleep(1.0)
-      hmqtt.display_text('On Their way')
-    elif trumpy_state == State.q2ans:
-      trumpy_bear.ans2 = arg
-      next_state = State.q3ans
-      hmqtt.ask('happy egrets')
-      time.sleep(2)
-      hmqtt.display_text("Arming Defenses")
-    elif trumpy_state == State.q3ans:
-      trumpy_bear.ans3 = arg
-      next_state = State.q4ans
-      hmqtt.ask("bring out the terrapins")
-      time.sleep(2)
-      hmqtt.display_text('Story or Talk?')
-    elif trumpy_state == State.q4ans:
-      applog.debug(f"answered {arg}")
-      if arg == 'talk':
-        # TODO: start mycroft or rasa for origin story
-        next_state = State,role_dispatch
-      elif arg == 'music' or arg == None:
-        # leave the state_machine cycle
-        next_state = State,role_dispatch
-      elif arg == 'quit':
-        trumpy_bear.role = Role.owner
-        next_state = State,role_dispatch
+    elif trumpy_state == State.four_qs:
+      next_state = State.four_qs
+      if ans_typ == 'ans1':
+        trumpy_bear.ans1 = arg
+        hmqtt.display_text('dialing..')
+        time.sleep(2.0)
+        hmqtt.display_text('connected..')
+        time.sleep(3.0)
+        hmqtt.display_text('On Their way')
+      elif ans_typ == 'ans2':
+        trumpy_bear.ans2 = arg
+        time.sleep(2)
+        hmqtt.display_text("Arming Defenses")
+      elif ans_typ == 'ans3':
+        trumpy_bear.ans3 = arg
+        time.sleep(2)
+        hmqtt.display_text('Music or Talk?')
+      elif ans_typ == 'ans4':
+        applog.debug(f"answered {arg}")
+        trumpy_bear.ans4 = arg
+        if arg == 'talk':
+          # TODO: start mycroft or rasa for origin story
+          next_state = State.role_dispatch
+        elif arg == 'music' or arg == None:
+          # leave the state_machine cycle
+          next_state = State.role_dispatch
+        else:
+          next_state = State.role_dispatch
       else:
-        next_state = State,role_dispatch
+        applog.warn(f'unknown ans {ans_typ} {arg}')
     else:
       applog.debug('no handler in {} for {}'.format(trumpy_state, evt))
   elif evt == Event.pict:
@@ -294,14 +299,14 @@ def state_machine(evt, arg=None):
       else:
         trumpy_bear.role = Role.unknown
       trumpy_bear.save_user()
-      hmqtt.speak('Click. Got it ')
+      hmqtt.speak('Got it')
       # wait for speech to finish
       time.sleep(3)
       if trumpy_bear.role == Role.unknown:
         time.sleep(1)
-        next_state = State.q1ans 
+        next_state = State.four_qs 
         hmqtt.display_text('You are Unknown')
-        hmqtt.ask('call the cops')
+        hmqtt.ask('send in the terrapin')
       else:
         next_state = State.role_dispatch
         hmqtt.speak('Your access permissions are being checked, {}'.format(trumpy_bear.name))
@@ -322,9 +327,8 @@ def state_machine(evt, arg=None):
 
   elif evt == Event.abort:
     next_state = State.aborting
-  elif evt == Event.ranger:
-    pass
   elif evt == Event.watchdog:
+    # TODO: implement. maybe.
     applog.debug('no handler in {} for {}'.format(trumpy_state, evt))
 
   else:
@@ -336,9 +340,6 @@ def state_machine(evt, arg=None):
   # unlock machine
   sm_lock.release()
   if trumpy_state == State.aborting:
-    #if playSiren == True:
-    #  applog.debug("siren active, killing")
-    #  sirenCb('off')
     trumpy_state = State.initialized
     interaction_finished()
   if trumpy_state == State.role_dispatch:
@@ -395,8 +396,7 @@ def begin_rasa(tb):
   hmqtt.display_text(f"{tb.name} to see Mr. Sanders")
   #hmqtt.speak("Mister Sanders is not available {}. Try later.".format(tb.name))
   hmqtt.ask('Mister Sanders, {} is here'.format(tb.name))
-  time.sleep(1)
-  interaction_finished()
+  long_timer(1)
       
 def begin_intruder():
   print('begin intruder')
@@ -407,7 +407,7 @@ def begin_intruder():
     print("intruder", cnt)
     hmqtt.display_text("Hands Up")
     time.sleep(1)
-    hmqtt.display_text("Don't Shoot")
+    hmqtt.display_text("On Your Knees")
     time.sleep(1)
     cnt += 1
   print('exiting intruder')

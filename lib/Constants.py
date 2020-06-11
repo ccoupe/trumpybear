@@ -20,12 +20,13 @@ class State(enum.Enum):
   waitfront = 5
   waitrecog = 6
   role_dispatch = 7
-  q1ans = 8
-  q2ans = 9
-  q3ans = 10
+  four_qs = 8
+  #q1ans = 8
+  #q2ans = 9
+  #q3ans = 10
   aborting = 11
   waitrange = 12
-  q4ans = 13
+  #q4ans = 13
 
 class Event(enum.Enum):
   start = 0   # from mqtt (hubitat)
