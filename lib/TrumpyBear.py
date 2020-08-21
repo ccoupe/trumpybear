@@ -13,6 +13,10 @@ class TrumpyBear:
     self.log = settings.log
     self.face_path = None
     self.db_path = settings.db_path
+    self.ans1 = ''
+    self.ans2 = ''
+    self.ans3 = ''
+    self.ans4 = ''
     # load the db
     np = os.path.join(self.db_path, 'names.json')
     if os.path.isfile(np):

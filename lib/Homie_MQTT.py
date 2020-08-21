@@ -20,6 +20,7 @@ class Homie_MQTT:
     self.strobeCb = strobeCb
     self.controller = None
     self.state_machine = sm
+    self.mic_mute = False
     
     # init server connection
     self.client = mqtt.Client(settings.mqtt_client_name, False)
@@ -55,21 +56,30 @@ class Homie_MQTT:
     self.hstrobe_sub = "homie/"+hdevice+"/strobe/state/set"
     # esp32 with display and autoranger
     self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
-
+    # camera motion detector
+    flds = settings.camera_topic.split('/')
+    flds[3] = 'motion'
+    flds.pop()
+    self.hmotsub = '/'.join(flds)
+    
+    # Shoes app listens for login/registation info at:
+    self.hscn_pub = f'homie/{hdevice}/screen/control/set'
+    
     self.log.debug("Homie_MQTT __init__")
     self.create_topics(hdevice, hlname)
     for sub in [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hchime_sub,
-        self.hsiren_sub, self.hstrobe_sub, self.hrgrsub]:
+        self.hsiren_sub, self.hstrobe_sub, self.hrgrsub, self.hmotsub]:
       rc,_ = self.client.subscribe(sub)
       if rc != mqtt.MQTT_ERR_SUCCESS:
         self.log.warn(f"Subscribe to {sub} failed: {rc}")
       else:
-        self.log.debug(f"Init() Subscribed to{sub}") 
+        self.log.debug(f"Init() Subscribed to {sub}") 
 
     self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
     self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
     self.hdspcmd = 'homie/trumpy_ranger/display/mode/set'
     self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
+    
       
   def create_topics(self, hdevice, hlname):
     self.log.debug("Begin topic creation")
@@ -81,7 +91,7 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/$mac", self.settings.macAddr)
     self.publish_structure("homie/"+hdevice+"/$localip", self.settings.our_IP)
     # could have two nodes, player and alarm
-    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, speech, chime, siren, strobe")
+    self.publish_structure("homie/"+hdevice+"/$nodes", "player, control, speech, chime, siren, strobe, screen")
     
     # player node
     self.publish_structure("homie/"+hdevice+"/player/$name", hlname)
@@ -157,6 +167,17 @@ class Homie_MQTT:
     self.publish_structure("homie/"+hdevice+"/strobe/state/$datatype", "string")
     self.publish_structure("homie/"+hdevice+"/strobe/state/$settable", "true")
     self.publish_structure("homie/"+hdevice+"/strobe/state/$retained", "true")
+
+    # screen node
+    self.publish_structure("homie/"+hdevice+"/screen/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/screen/$type", "strobe")
+    self.publish_structure("homie/"+hdevice+"/screen/$properties","state")
+    #  'state' Property of 'strobe'
+    self.publish_structure("homie/"+hdevice+"/screen/state/$name", hlname)
+    self.publish_structure("homie/"+hdevice+"/screen/state/$datatype", "string")
+    self.publish_structure("homie/"+hdevice+"/screen/state/$settable", "true")
+    self.publish_structure("homie/"+hdevice+"/screen/state/$retained", "true")
+
    # Done with structure. 
 
     self.log.debug("homie topics created")
@@ -203,6 +224,9 @@ class Homie_MQTT:
         strobe_thr = Thread(target=self.strobeCb, args=(payload,))
         strobe_thr.start()
         #self.strobeCb(payload)
+      elif topic == self.hmotsub:
+        motion_thr = Thread(target=self.state_machine, args=(Event.motion, payload))
+        motion_thr.start()
       else:
         self.log.debug(f"on_message() unknown command {topic} {payload}")
     except :
@@ -244,11 +268,15 @@ class Homie_MQTT:
     self.client.publish(self.hask_pub, str)
 
   def tts_unmute(self):
-    self.client.publish(self.hctl_pub, 'on')
+    if self.mic_mute == True:
+      self.client.publish(self.hctl_pub, 'on')
+    self.mic_mute = False
     
   def tts_mute(self):
-    self.client.publish(self.hctl_pub, 'off')
-
+    if self.mic_mute == False: 
+      self.client.publish(self.hctl_pub, 'off')
+    self.mic_mute = True
+      
   # these talk to the trumpy_ranger device/node
   def display_cmd(self, st):
     self.client.publish(self.hdspcmd, st)
@@ -261,14 +289,14 @@ class Homie_MQTT:
     
   def ranger_mode(self, str):
     self.client.publish(self.hrgrmode, str)
-    
+  
+  # Hubitat specific
   def enable_player(self):
     self.client.publish(self.hEnbl_pub, "on")
     
   def enable_cops(self):
     self.client.publish(self.hCops_pub, "on")
-    
-  # consider this a hack - it probably shouldn't work but it does.
-  def loop(self):
-    self.client.loop()
   
+  def login(self, json):
+    self.client.publish(self.hscn_pub,json) 
+

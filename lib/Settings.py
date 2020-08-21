@@ -7,9 +7,9 @@ import sys
 
 class Settings:
 
-  def __init__(self, etcf, varf, log):
+  def __init__(self, etcf, adev, log):
     self.etcfname = etcf
-    self.varfname = varf
+    self.audiodev = adev
     self.log = log
     self.mqtt_server = "192.168.1.7"   # From json
     self.mqtt_port = 1883              # From json
@@ -39,6 +39,12 @@ class Settings:
     # expand camera_topic
     self.camera_topic = 'homie/'+self.camera_topic+'/motionsensor/control/set'
     self.log.info("Settings from %s" % self.etcfname)
+    self.player_vol_default = self.audiodev.sink_volume
+    self.chime_vol_default = self.audiodev.sink_volume
+    self.siren_vol_default = self.audiodev.sink_volume
+    self.player_vol = self.audiodev.sink_volume
+    self.chime_vol = self.audiodev.sink_volume
+    self.siren_vol = self.audiodev.sink_volume
     
   def load_settings(self, fn):
     conf = json.load(open(fn))
@@ -53,7 +59,7 @@ class Settings:
     self.face_server_ip = conf.get('face_server_ip', '192.168.1.4')
     self.face_port = conf.get('face_port', 4774)
     self.db_path = conf.get('db_path', self.db_path)
-    self.ranger_mode = conf.get('ranger_mode', 'once')
+    self.ranger_mode = conf.get('ranger_mode', None)
 
 
   def print(self):
