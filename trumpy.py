@@ -205,7 +205,7 @@ def main():
   args = vars(ap.parse_args())
   
   # logging setup
-  applog = logging.getLogger('mqttplayer')
+  applog = logging.getLogger('trumpybear')
   #applog.setLevel(args['log'])
   if args['syslog']:
     applog.setLevel(logging.DEBUG)
@@ -556,11 +556,12 @@ def register_machine(evt, arg=None):
         role = trumpy_bear.check_user(arg)
         hmqtt.speak("I'm going to take your picture. Face the bear and stand up straight")
         hmqtt.display_text("Face the Bear")
-        time.sleep(2)
+        time.sleep(3)
         next_state = State.waitface
         request_picture('face')
   elif evt == Event.pict:
     if trumpy_state == State.waitrecog:
+      # doing a login? 
       hmqtt.start_ranger(0);  # zero stops ranger.
       trumpy_bear = TrumpyBear(settings,None)
       trumpy_bear.face_path = "/var/www/camera/face.jpg"
@@ -577,9 +578,10 @@ def register_machine(evt, arg=None):
           logout_timer()
           next_state = State.starting
       else:
-        # not a registerd person so ask for name.
-        hmqtt.ask('awaken the hooligans')
-        next_state = State.waitname
+        # not a registered person - ignore
+        hmqtt.display_text("I don't recognize you.")
+        logout_timer()
+        next_state = State.starting
     elif trumpy_state == State.waitface:
       # finish registration - have face and picture.
       # send them to fc server
@@ -602,8 +604,9 @@ def register_machine(evt, arg=None):
       trumpy_bear = TrumpyBear(settings, 'perp')
       hmqtt.speak('I asked nicely. Oh Well. Too Bad');
     elif trumpy_state == State.waitrange:
-      next_state = State.waitrecog
-      request_picture('face')
+      next_state = State.waitname
+      hmqtt.ask('awaken the hooligans')
+
 
   elif evt == Event.abort:
     next_state = State.aborting
@@ -644,8 +647,10 @@ def role_dispatch(trumpy_bear):
     interaction_finished()
 
 def logout_timer_fired():
-  global hmqtt
+  global hmqtt, applog
   hmqtt.login('{"cmd": "logout"}')
+  hmqtt.display_cmd("off")
+  applog.info('logging off')
   
 def logout_timer(min=5):
   print('creating logout timer')
@@ -769,7 +774,7 @@ def wakeup_login():
   pict_count = 0
   time.sleep(1)
   new_sm(register_machine)
-  applog.info("Trumpy Bear login attemp")
+  applog.info("Trumpy Bear login attempt")
   state_machine(Event.start, 'login')
   hmqtt.client.publish(settings.status_topic, 'login')
 
@@ -803,6 +808,9 @@ def trumpy_recieve(jsonstr):
     if state_machine is None:
       applog.warning('Cecil, init the state_machine')
     state_machine(Event.pict)
+  elif cmd == 'mycroft':
+      hmqtt.tts_unmute()
+      begin_mycroft()
   elif cmd == 'alarm':
     #TODO not needed? my_tts(rargs['text'])
     pass

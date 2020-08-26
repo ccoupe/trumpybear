@@ -49,7 +49,6 @@ class Homie_MQTT:
     self.hctl_pub = "homie/"+hdevice+"/speech/ctl/set"
     # TODO: HARD CODED is evil and it's not Homie compat:
     self.hEnbl_pub = "homie/trumpy_enable/switch/state"
-    self.hCops_pub = "homie/trumpy_cops/switch/state"
     # newer device nodes to listen on
     self.hchime_sub = "homie/"+hdevice+"/chime/state/set"
     self.hsiren_sub = "homie/"+hdevice+"/siren/state/set"
@@ -293,10 +292,7 @@ class Homie_MQTT:
   # Hubitat specific
   def enable_player(self):
     self.client.publish(self.hEnbl_pub, "on")
-    
-  def enable_cops(self):
-    self.client.publish(self.hCops_pub, "on")
-  
+      
   def login(self, json):
     self.client.publish(self.hscn_pub,json) 
 
