@@ -61,6 +61,14 @@ class TrumpyBear:
     now = datetime.now()
     fn = now.strftime("%Y-%m-%d_%H-%M-%S.jpg")
     shutil.copyfile(self.face_path, os.path.join(facepath, fn))
-    self.log.info('pictures saved in {}'.format(self.db_path))
+    self.log.info('picture saved in {}'.format(self.db_path))
+    # trim to the last 4. 
+    fns = os.listdir(facepath)
+    fns = sorted(fns)
+    while len(fns) > 4:
+      fn = fns.pop(0)
+      self.log.info(f'trimming {self.name}/face/{fn}')
+      os.remove(f'/home/pi/.trumpybear/{self.name}/face/{fn}')
+      
     return
     

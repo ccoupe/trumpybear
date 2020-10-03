@@ -1,9 +1,10 @@
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
-  "mqtt_client_name": "trumpy_bear1",
-  "homie_device": "trumpy_bear",
-  "homie_name": "Trumpy Bear Pi3",
-  "camera_topic": "trumpy_cam",
-  "mycroft_ip": "192.168.1.2"
+  "mqtt_client_name": "test_bear1",
+  "homie_device": "test_bear",
+  "homie_name": "Test Bear Bronco",
+  "camera_topic": "office_webcam",
+  "mycroft_ip": "192.168.1.2",
+  "ranger_mode": null
 }

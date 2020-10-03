@@ -4,6 +4,7 @@
   "mqtt_client_name": "trumpy_bear1",
   "homie_device": "trumpy_bear",
   "homie_name": "Trumpy Bear Pi3",
+  "camera_number": 0,
   "camera_topic": "trumpy_cam",
   "mycroft_ip": "192.168.1.10",
   "ranger_mode": "once"

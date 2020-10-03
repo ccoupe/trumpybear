@@ -20,7 +20,6 @@ class Homie_MQTT:
     self.strobeCb = strobeCb
     self.controller = None
     self.state_machine = sm
-    self.mic_mute = False
     
     # init server connection
     self.client = mqtt.Client(settings.mqtt_client_name, False)
@@ -49,25 +48,31 @@ class Homie_MQTT:
     self.hctl_pub = "homie/"+hdevice+"/speech/ctl/set"
     # TODO: HARD CODED is evil and it's not Homie compat:
     self.hEnbl_pub = "homie/trumpy_enable/switch/state"
+    self.hCops_pub = 'homie/trumpy_cops/switch/state'
     # newer device nodes to listen on
     self.hchime_sub = "homie/"+hdevice+"/chime/state/set"
     self.hsiren_sub = "homie/"+hdevice+"/siren/state/set"
     self.hstrobe_sub = "homie/"+hdevice+"/strobe/state/set"
     # esp32 with display and autoranger
     self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
+    sublist = [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hchime_sub,
+        self.hsiren_sub, self.hstrobe_sub, self.hrgrsub]
     # camera motion detector
-    flds = settings.camera_topic.split('/')
-    flds[3] = 'motion'
-    flds.pop()
-    self.hmotsub = '/'.join(flds)
+    if settings.local_cam is None:
+      flds = settings.camera_topic.split('/')
+      flds[3] = 'motion'
+      flds.pop()
+      self.hmotsub = '/'.join(flds)
+      sublist.append(self.hmotsub)
+    else:
+      self.hmotsub = ''
     
     # Shoes app listens for login/registation info at:
     self.hscn_pub = f'homie/{hdevice}/screen/control/set'
     
     self.log.debug("Homie_MQTT __init__")
     self.create_topics(hdevice, hlname)
-    for sub in [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hchime_sub,
-        self.hsiren_sub, self.hstrobe_sub, self.hrgrsub, self.hmotsub]:
+    for sub in sublist:
       rc,_ = self.client.subscribe(sub)
       if rc != mqtt.MQTT_ERR_SUCCESS:
         self.log.warn(f"Subscribe to {sub} failed: {rc}")
@@ -267,14 +272,10 @@ class Homie_MQTT:
     self.client.publish(self.hask_pub, str)
 
   def tts_unmute(self):
-    if self.mic_mute == True:
-      self.client.publish(self.hctl_pub, 'on')
-    self.mic_mute = False
+    self.client.publish(self.hctl_pub, 'on')
     
   def tts_mute(self):
-    if self.mic_mute == False: 
-      self.client.publish(self.hctl_pub, 'off')
-    self.mic_mute = True
+    self.client.publish(self.hctl_pub, 'off')
       
   # these talk to the trumpy_ranger device/node
   def display_cmd(self, st):
@@ -295,4 +296,7 @@ class Homie_MQTT:
       
   def login(self, json):
     self.client.publish(self.hscn_pub,json) 
+    
+  def cops_arrive(self):
+    self.client.publish(self.hCops_pub, 'on')
 
