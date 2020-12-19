@@ -11,7 +11,8 @@ class Algo:
     self.log = settings.log
     if self.settings.use_ml == 'remote':
       self.proxy = rpyc.connect(settings.ml_server_ip, settings.ml_port, 
-          config={'allow_public_attrs': True})
+          config={'allow_all_attrs': True, 'allow_public_attrs': True})
+          #config={'allow_public_attrs': True})
     else:
       if name == 'Cnn_Shapes':
         self.classes = ["background", "aeroplane", "bicycle", "bird", "boat",
@@ -70,16 +71,18 @@ class Algo:
     #self.log('Faces: %d' % n);
     return (n > 0, n)
 
-  def shapes_detect(self, image, threshold, debug):
-    #self.log("shape check")
+  # Requirement - image is 300 x 300
+  def shapes_detect(self, frame, threshold, debug):
+    #print("shape check")
     n = 0
+    #(org_h, org_w) = image.shape[:2]
     # grab the frame from the threaded video stream and resize it
     # to have a maximum width of 400 pixels
-    frame = imutils.resize(image, width=400)
-  
+    #frame = image #imutils.resize(image, width=400)
     # grab the frame dimensions and convert it to a blob
     (h, w) = frame.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
+    #blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
+    blob = cv2.dnn.blobFromImage(frame,
       0.007843, (300, 300), 127.5)
   
     # pass the blob through the network and obtain the detections and
@@ -100,27 +103,17 @@ class Algo:
         # `detections`, then compute the (x, y)-coordinates of
         # the bounding box for the object
         idx = int(detections[0, 0, i, 1])
-        if idx == 15:
-          n += 1
-          break
-        if debug:
-          box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-          (startX, startY, endX, endY) = box.astype("int")
-    
-          # draw the prediction on the frame
-          label = "{}: {:.2f}%".format(self.classes[idx],
-            confidence * 100)
-          cv2.rectangle(frame, (startX, startY), (endX, endY),
-            COLORS[idx], 2)
-          y = startY - 15 if startY - 15 > 15 else startY + 15
-          cv2.putText(frame, label, (startX, y),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.colors[idx], 2)
-  
-    # show the output frame
-    if debug:
-      cv2.imshow("Detect", frame)
-    self.log.info("shapes = %d" % n)
-    return (n > 0, n)
+        if idx != 15:
+          # 15 is human shape - ignore the others.
+          continue
+        
+        box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+        (startX, startY, endX, endY) = box.astype("int")
+        #print(f'found {startX},{startY},{endX},{endY}')
+        rect = (startX, startY, endX, endY)
+        return (True, rect)
+        
+    return (False, (None,))
 
   # ----- haar detectors
   def haar_detect(self, frame, threshold, debug):

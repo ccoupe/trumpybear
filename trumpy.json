@@ -7,5 +7,32 @@
   "camera_number": 0,
   "camera_topic": "trumpy_cam",
   "mycroft_ip": "192.168.1.10",
-  "ranger_mode": "once"
+  "ranger_mode": "once",
+  "face_server_ip": "192.168.1.4",
+  "face_port": 4774,
+  "ml_algo": "Cnn_Shapes",
+  "confidence": 0.4,
+  "ml_server_ip": "192.168.1.2",
+  "ml_port": 4783,
+  "use_ml": "remote_zmq",
+  "turrets": [
+    {
+	"name": "Front Center",
+	"topic": "homie/turret_front/turret_1/control",
+    "front": true,
+	"pan_min": 51,
+	"pan_max": 150,
+	"tilt_min": 70,
+    "tilt_max": 120
+    },
+    {
+	"name": "Left Back",
+	"topic": "homie/turret_back/turret_1/control",
+    "front": false,
+	"pan_min": 60,
+	"pan_max": 180,
+	"tilt_min": 80,
+	"tilt_max": 120
+    }
+  ]
 }

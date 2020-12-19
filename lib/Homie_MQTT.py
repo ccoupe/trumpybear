@@ -299,4 +299,8 @@ class Homie_MQTT:
     
   def cops_arrive(self):
     self.client.publish(self.hCops_pub, 'on')
+    
+  # yet another thing to talk to
+  def tracker(self, json):
+    self.client.publish('homie/turret_tracker/track/control/set', json)
 

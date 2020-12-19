@@ -1,5 +1,7 @@
-# Trumpy Bear
+# Trumpy Bear BAD
 ## Purpose
+The meme says "Orange Man Bad". So I built Trumpy Bear Burglar Alarm  and Distraction
+
 Burglar Alarm or Distraction? Rube Goldberg or performance art?
 Tied into Home Automation as an Alarm System but it's more than that.
 Still, an 'Alarm' System is a decent metaphor for how the system works from a
@@ -9,7 +11,7 @@ the 'system' is armed.
 
 Trumpy Bear is also a sort of entertainment device. It gives the bulglar an
 interactive multimedia experience. It pleases me to develop it. It's a show
-case of interesting things.
+case of interesting tehnical things.
 
 ### Hubitat, MQTT and HSM
 Hubitat Elevation (or HE) is a home automation product, (a hub) to control
@@ -17,10 +19,23 @@ lights, switches, and more. It allows user written device drivers and 'apps' so
 it can be used to integrate odd devices. Trumpy Bear is an odd device. Actually
 it is a collection of devices.
 
-HE Concepts: Events, Triggers and Rules.
-HE Concepts: Mode
-HE Concepts: Presence
-HE Concepts: HSM
+#### HE Concepts: Events, Triggers, Commands and Rules.
+Drivers listen to device activity and 'commands' When the device does
+something the driver (say motion detected) itcreates an 'Event' and sends it to the Hubitat internals
+where it triggers 'Apps' listening for that event. There can be multiple
+apps waiting for that trigger. One app is 'Rule Machine' which is a Domain
+Specific Language (DSL) for writing automations. Other apps are written
+in Groovy - some are included with Hubitat and some are 'community' written.
+Drivers and apps are written in constrained Groovy for a sandbox.
+
+Rules and Apps can also call 'commands' in drivers. For example if the
+driver tells hubitat that it is a 'switch' then it has to provide on() and
+off() functions. 
+
+#### HE Concepts: Mode
+Hubitat can have a 'Mode' like day,evening,night. 
+#### HE Concepts: Presence
+#### HE Concepts: HSM
 
 MQTT is used to communicate between devices and processes and sometimes 
 intra-process. From the Hubitat point of view intrgration could be done

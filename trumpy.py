@@ -13,12 +13,14 @@ import time, threading, sched
 from threading import Lock, Thread
 import socket
 import os
+import shutil
 from subprocess import Popen
 from lib.Settings import Settings
 from lib.Homie_MQTT import Homie_MQTT
 from lib.Audio import AudioDev
 from lib.Constants import State, Event, Role
 from lib.TrumpyBear import TrumpyBear
+from lib.Algo import Algo
 import urllib.request
 import logging
 import logging.handlers
@@ -26,6 +28,7 @@ import numpy as np
 import cv2
 import imutils
 from imutils.video import VideoStream
+import imagezmq
 import rpyc
 
 # globals
@@ -43,10 +46,11 @@ registering = False
 state_machine = None
 video_dev = None
 active_timer = None
-
+ml_dict = {}
 
 play_mp3 = False
 player_obj = None
+zmqsender = None
 
 def mp3_player(fp):
   global player_obj, applog, audiodev
@@ -193,10 +197,20 @@ def start_muted():
   applog.info(f'startup muting')
   hmqtt.display_cmd('off')
   hmqtt.tts_mute()
-  
+
+def build_ml_dict(settings):
+  global ml_dict
+  #ml_dict['Cnn_Face'] = Algo('Cnn_Face', settings)
+  ml_dict['Cnn_Shapes'] = Algo('Cnn_Shapes', settings)
+  #ml_dict['Haar_Face'] = Algo('Haar_Face', settings)
+  #ml_dict['Haar_FullBody'] = Algo('Haar_FullBody', settings)
+  #ml_dict['Haar_UpperBody'] = Algo('Haar_UpperBody', settings)
+  #ml_dict['Hog_People'] = Algo('Hog_People', settings)
+  return ml_dict
+
 def main():
   global settings, hmqtt, applog, face_proxy, audiodev, trumpy_state
-  global state_machine, video_dev
+  global state_machine, video_dev, ml_dict
   # process cmdline arguments
   loglevels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
   ap = argparse.ArgumentParser()
@@ -253,8 +267,12 @@ def main():
     
   # connect to the face recogition server
   face_proxy = rpyc.connect(settings.face_server_ip, settings.face_port, 
-          config={'allow_public_attrs': True})
-
+          #config={'allow_all_attrs': True})
+          config={'allow_all_attrs': True, 'allow_public_attrs': True})
+          
+  # setup ml_dict for shape detector(s)
+  ml_dict = build_ml_dict(settings)
+  
   # Turn off display, mute mycroft
   th = threading.Timer(2 * 60, start_muted)
   th.start()
@@ -276,7 +294,7 @@ def new_sm(ns):
 # well thought out idea
 def tame_machine(evt, arg=None):
   global applog, settings, hmqtt, trumpy_state, trumpy_bear
-  global tm_lock
+  global sm_lock
   cur_state = trumpy_state
   next_state = cur_state
   applog.debug("Tm entry {} {}".format(trumpy_state, evt))
@@ -729,14 +747,8 @@ def begin_intruder():
   global applog, hmqtt
   applog.info('begin intruder')
   hmqtt.enable_player()      # sets mqtt switch to wake up a HE RM rule
-  cnt = 0
-  while cnt < 31:
-    print("intruder", cnt)
-    hmqtt.display_text("Hands Up")
-    time.sleep(1)
-    hmqtt.display_text("On Your Knees")
-    time.sleep(1)
-    cnt += 1
+  hmqtt.display_text("Lasers are Tracking")
+  begin_tracking(2, False);
   print('exiting intruder')
   long_timer(2)
 
@@ -840,7 +852,13 @@ def wakeup_login():
   state_machine(Event.start, 'login')
   hmqtt.client.publish(settings.status_topic, 'login')
 
-
+def begin_logout():
+  global settings, hmqtt, applog, tracking_stop_flag, tame_machine
+  global state_machine
+  hmqtt.display_cmd(self, 'off')
+  tracking_stop_flag = True
+  new_sm(tame_machine)
+  
 # the command channel controls the device from hubitat via mqtt
 # AND from the Touch Screen (login) app
 def trumpy_recieve(jsonstr):
@@ -878,11 +896,249 @@ def trumpy_recieve(jsonstr):
     extend_logout(s)
   elif cmd == 'mycroft':
       begin_mycroft()
+  elif cmd == 'track':
+    try:
+      dbg = rargs.get('debug',False)
+      applog.info('calling begin_tracking')
+      begin_tracking(1, dbg)
+    except:
+      traceback.print_exc()
+  elif cmd == 'calib':
+    begin_calibrate(rargs['distance'],rargs['time'])
+  elif cmd == 'closing':
+    # Front panel logoff - probably manual.
+    begin_logout
+  elif cmd == 'get_turrets':
+    dt = {'cmd': 'set_turrets', 'turrets': settings.turrets}
+    hmqtt.login(json.dumps(dt))
   elif cmd == 'alarm':
     #TODO not needed? HE already knows? 
     pass
+    
+  
+def image_serialize(frame):
+  image = frame 
+  _, jpg = cv2.imencode('.jpg',image)
+  bfr = jpg.tostring()
+  return bfr
+  
+def motion_track_rpc(display):
+  global tracking_stop_flag, video_dev, ml_dict, applog
+  global settings
+  # camera warmup time:
+  #applog.info('motion_track_rpc called')
+  time.sleep(1)
+  mlobj = ml_dict['Cnn_Shapes']
+  rc = settings.use_ml == 'remote_rpc'
+  cnt = 0
+  hits = 0
+  applog.info(f'begin rpc loop: {tracking_stop_flag}')
+  while not tracking_stop_flag:
+    tf, frame = video_dev.read()
+    if not tf:
+      applog.info('failed camera read')
+      continue
+    cnt += 1
+    if rc: 
+      # send frame to rpc, get back a (boolean, rect) if true, then rect is good
+      found, rect = mlobj.proxy.root.detectors (settings.ml_algo, False, 
+          settings.confidence, image_serialize(frame))
+    else:
+      applog.info(f'lcl processing frame {cnt} {type(mlobj)}')
+      found, rect = mlobj.proxy(settings.ml_algo, False, 
+          settings.confidence, frame)
+    if found: 
+      (x, y, ex, ey) = rect     
+      hits += 1 
+      #!! json does not handle numpy int64's. Convert to int.
+      dt = {'cmd': "trk", 'cnt': cnt, "x": int(x), "y": int(y), "ex": int(ex), "ey": int(ey)}
+      jstr = json.dumps(dt)
+      for tur in settings.turrets: 
+        hmqtt.client.publish(f"{tur['topic']}/set", jstr)
+       
+      cv2.rectangle(frame,(x,y),(ex,ey),(0,255,210),4)
+      if display:
+        dt = {'cmd': 'tracking', 'msg': jstr} 
+        hmqtt.login(json.dumps(dt))
+    
+  applog.info(f'ending rpc loop {cnt} frames {cnt/120} fps for {hits}')
+  video_dev.release()
   
 
+def motion_track_zmq(display):
+  global tracking_stop_flag, video_dev, zmqsender, applog
+  global settings
+  # camera warmup time:
+  applog.info('motion_track_zmq called')
+  time.sleep(1)
+  jpeg_quality = 95
+  cnt = 0
+  while not tracking_stop_flag:
+    tf, frame = video_dev.read()
+    if not tf:
+      applog.info('failed camera read')
+      continue
+    cnt += 1
+    try:
+      ret_code, jpg_buffer = cv2.imencode(
+            ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+      zmqsender.send_jpg('trumpy4', jpg_buffer)
+    except:
+      applog.info(f'failed sending frame# {cnt} {len(jpg_buffer)}')
+      traceback.print_exc()
+    '''
+    try: 
+      zmqsender.send_image('trumpy4', frame)
+    except:
+      applog.info('failed to send image')
+    '''
+    #applog.info(f'sent {cnt}')
   
+  applog.info(f'closing image socket, {cnt} , {cnt/120} fps')
+  zmqsender.close()
+  video_dev.release()
+  
+def tracking_timer(min=5):
+  print('creating tracking timer')
+  tracking_thread = threading.Timer(min * 60, tracking_finished)
+  tracking_thread.start()
+
+zmqsender = None
+
+# it gets complicated. we need some time for the server to get
+# cranking
+def begin_tracking(min=0.5, debug=False):
+  global hmqtt, applog, settings, tracking_stop_flag, video_dev
+  # open the camera 
+  video_dev = cv2.VideoCapture(settings.local_cam)
+  video_dev.set(3, 640)
+  video_dev.set(4, 480)
+  hmqtt.tracker(json.dumps({'begin':True}))
+  time.sleep(2) # 2 sec for camera to settle and for server to set up
+  try:
+    if settings.use_ml == 'remote_zmq': 
+      global zmqsender
+      uri = f'tcp://{settings.ml_server_ip}:{settings.ml_port}'
+      #zmqsender = imagezmq.ImageSender(connect_to='tcp://192.168.1.2:4783')
+      zmqsender = imagezmq.ImageSender(connect_to=uri)
+      
+    applog.info("in begin tracking")
+    tracking_stop_flag = False
+    tracking_timer(min)
+    if settings.use_ml == 'remote_rpc':
+      trk_thread = Thread(target=motion_track_rpc, args=(debug,))
+    elif settings.use_ml == 'remote_zmq':
+      trk_thread = Thread(target=motion_track_zmq, args=(debug,))
+    trk_thread.start()
+  except:
+    traceback.print_exc()
+  
+def tracking_finished():
+  global tracking_stop_flag, applog, video_dev, hmqtt, zmqsender
+  tracking_stop_flag = True
+  applog.info('tracking timer fired')
+  pt = {'power': 0}
+  hmqtt.client.publish('homie/turret_front/turret_1/control/set', json.dumps(pt))
+  hmqtt.tracker(json.dumps({'end':True}))
+    
+def calib_machine(evt, arg=None):
+  global sm_lock, trumpy_state, calib_distance
+  applog.debug("cm entry {} {}".format(trumpy_state, evt))
+  cur_state = trumpy_state
+  # lock machine
+  sm_lock.acquire()
+  next_state = None
+  if evt == Event.abort:
+    next_state = State.aborting
+  elif evt == Event.ranger:
+    next_state = trumpy_state
+    calib_distance = int(arg)
+  else:
+    applog.info('unknown state for calib mode')
+  trumpy_state = next_state
+  applog.debug("cm exit {} {} => {}".format(cur_state, evt, trumpy_state))
+  
+  # unlock machine - now we can call long running things
+  sm_lock.release()
+
+
+def begin_calibrate(meters, secs):
+  global settings, hmqtt, video_dev, applog, state_machine, ml_dict
+  # create directory for 'meters' arg. Holds pict<n>.jpg and data.csv
+  # files. 
+  from os import path
+  path  = f'/home/pi/.calib/{meters}M'
+  #if path.exists(path):
+  #  shutil.rmtree(path)
+  os.makedirs(path)
+  csv_path = f'{path}/data.csv'
+  csvf = open(csv_path, mode='w')
+  applog.info(f'Begin {meters} Meter sweep for {secs}')
+  # csv format: f'{cnt}, {fr_num}, {range}, {x}, {y}, {ex}, {ey}, {area}, {ctr_x}, {ctr_y}
+  # open camera, wait for two secs to warmup and human move to place.
+  video_dev = cv2.VideoCapture(settings.local_cam)
+  video_dev.set(3, 640)
+  video_dev.set(4, 480)
+  mlobj = ml_dict['Cnn_Shapes']
+
+  time.sleep(1+meters)
+  # compute ending time.
+  now = time.time()
+  et = now + secs
+  applog.info(f'begin {time.time()} --> {et}')
+  # Need a new state machine for dealing with Evt.Ranger coming in aysnchronously
+  #old_machine = state_machine # save current
+  #new_sm(calib_machine)
+  # turn on ranger.
+  
+  frnum = 0
+  cnt = 0
+  rc = settings.use_ml == 'remote_rpc'
+  #rc = False
+  while time.time() <= et:
+    tf, frame = video_dev.read()
+    if tf is None:
+      # trouble ahead
+      applog.info('failed to get frame')
+      break
+    
+    frnum += 1
+    applog.info(f'have frame {frnum} {type(mlobj)}')
+    # get a recog rect
+    
+    if rc:
+      # send frame to rpc, get back a (boolean, rect) if true, then rect is good
+      found, rect = mlobj.proxy.root.detectors (settings.ml_algo, False, 
+          settings.confidence, image_serialize(frame))
+    else:
+      found, rect = mlobj.proxy(settings.ml_algo, False, 
+          settings.confidence, frame)
+    if found: 
+      #print(f'{type(rect)} {rect}')
+      (x, y, ex, ey) = rect
+      cv2.rectangle(frame,(x,y),(ex,ey),(0,255,210),4)
+      cnt += 1
+      # save pict
+      fn = f'{path}/pict{cnt}.jpg'
+      cv2.imwrite(fn, frame)
+      w = ex - x
+      h = ey - y
+      ctr_x = int((w / 2) + x)
+      ctr_y = int((h / 2) + y)
+      # append to data file
+      msg = f'{frnum},{cnt},{x},{y},{ex},{ey},{w*h},{ctr_x},{ctr_y}'
+      csvf.write(f'{msg},{fn}\n')
+      #dt = {'cmd': 'tracking', 'msg': msg} 
+      #hmqtt.login(json.dumps(dt))
+      
+  applog.info('closing sweep')
+  # close data file
+  csvf.close()
+  # close video_dev
+  video_dev.release()
+  # turn off ranger.
+  # reset statemachine
+
+  new_sm(old_machine)
 if __name__ == '__main__':
   sys.exit(main())
