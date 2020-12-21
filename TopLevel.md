@@ -21,48 +21,61 @@ it is a collection of devices.
 
 #### HE Concepts: Events, Triggers, Commands and Rules.
 Drivers listen to device activity and 'commands' When the device does
-something the driver (say motion detected) itcreates an 'Event' and sends it to the Hubitat internals
+something the driver (say motion detected) creates an 'Event' and sends it to the Hubitat internals
 where it triggers 'Apps' listening for that event. There can be multiple
 apps waiting for that trigger. One app is 'Rule Machine' which is a Domain
 Specific Language (DSL) for writing automations. Other apps are written
 in Groovy - some are included with Hubitat and some are 'community' written.
-Drivers and apps are written in constrained Groovy for a sandbox.
+Drivers and apps are written in a sandbox constrained Groovy.
 
 Rules and Apps can also call 'commands' in drivers. For example if the
 driver tells hubitat that it is a 'switch' then it has to provide on() and
-off() functions. 
+off() functions that apps and rules can call.
 
 #### HE Concepts: Mode
-Hubitat can have a 'Mode' like day,evening,night. 
-#### HE Concepts: Presence
-#### HE Concepts: HSM
+Hubitat can have a 'Mode' like day,evening,night. And 'away'
 
+#### HE Concepts: Presence
+Certain devices, like a cell phone can be a presence device. Typically
+something like the Geofence capabilities in the Hubitat phone app. This is
+typically used to trigger away mode.
+
+#### HE Concepts: HSM
+Hubitat Security Monitor is not an alarm system although it lind of looks like
+one and smells like one. 
+
+## Communication. 
 MQTT is used to communicate between devices and processes and sometimes 
-intra-process. From the Hubitat point of view intrgration could be done
+intra-process. From the Hubitat point of view integration could be done
 with a REST or websocket style interface or MQTT. I choose MQTT because
 it's a centralized interface that allows either side (client or server) to
-disappear and reappear (think reboots and code changes). It's much simpler
+disappear and reappear (think pf reboots and code changes). It's much simpler
 to use than HTTP and more structured than websockets. Structure is good
 until it isn't. 
 
+There are only a few places where synchronization primitives are used because most
+things that happen are kind of 'any time after now is fine' for scheduling and events move 
+slow enough that it's not a big deal if a video frame is dropped.
+
 ## Components
-As mentioned above, Trumpy Bear is a collection of devices, rules, events,
+As mentioned above, Trumpy Bear is large collection of devices, rules, events,
 and technologies. These will not be described in great detail - they are
 'projects' of their own. The main parts of Trumpy Bear runs on a Raspberry
-pi 4  with a Touch Panel screen. It does not work well on a Pi 3 - it needs
+pi 4  with a Touch Panel screen. Note: It does not work well on a Pi 3 - it needs
 the speed and memory of a pi4.
 
 ### Audio
 We have to use Pulse Audio. This is not an easy fit on a Pi but it can be
-done. 
+done. Note: the Dec 2020 release of Raspberry OS now uses PulseAudio. Yay!
+
 #### Speaker 
-I choose to use a decent Bluetooth speaker. The built in audio jack of a Pi is
+I use a decent Bluetooth speaker. The built in audio jack of a Pi is
 not decent so bluetooth was the next easist (I thought). Decent has a personal price point. Mine was at $30.
 
 #### Microphone
 I use a Lapel 'clip on' microphone. It's quality is 'good' enough for
 this purpose - voice recording. I connect it to the Pi4 with usb adapter because
-the pi audio system is crap. Note the mic is clipped to Trumpy Bear's necktie.
+the pi audio system hardware is crap. Note the mic is clipped to Trumpy Bear's necktie.
 
 #### Mycroft
 Mycroft is a Voice Assistant like Amazon Alexa or Google Home or Apple's Siri, One
@@ -152,57 +165,87 @@ so they can login.
 
 Yes, a smart burglar could read this documentation and ask Alexa to register
 him and then turn off the alarm. There is always a weak spot. It's even
-easier to just tell alexa to turn on housekeeping. Yes, these holes will
-vanish in the future.
+easier to just tell alexa to turn on housekeeping. 
+
+### Login Mode
+This mode does some initialization for the 'Control Panel', the touch scree
+on the Pi. Trumpybear can run without the control panel but it makes debugging
+and testing so much nicer. It has very little state tracking which I consider a
+good thing.
+
 
 ### Login
 Login is not really a mode - Trumpy Bear doesn't really know or care.
 What can be done is via Hubitat rules and the housekeeping switch
 
 ### Notifcations
+
 ### Cancelling
+Cancelling an alarm is difficult because there is no central state. There
+is an attempt to skip certain noisy steps if the housekeeping switch is on.
 
 ## Node/Devices/Process/Topics
 ### TrumpyBear Device
 Node: trumpy4 aka trumpy4.local
       Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle.
-HE Driver: Mqtt Trumpy V2. Gitub:
-Python Github: 
+(HE Driver: Mqtt Trumpy V2)[https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy]
+(Python Github:)[https://github.com/ccoupe/trumpybear] 
 MQTT:  /homie/trumpy_bear/<seven devices>
 
-mycroft-bridge
-Python Github: 
-MQTT: 
+### mycroft-bridge
+(Python Github:)[https://github.com/ccoupe/trumpy_mycroft]
+MQTT:  hides in /homie/trumpy_bear/xxxxxx
 
-mycroft
-Python github:
+### mycroft
+### Python github:
 
 ### trumpy_ranger
 Node: esp32 192.168.1.xx
-Arduino C++ Github: 
+(Arduino C++ Github:)[https://github.com/ccoupe/arduino/tree/master/ranger]
 MQTT: 
 1. /homie/trumpy_ranger/autoranger
 2. /homie/trumpy_ranger/display
 
 ### Turrets
-Node: pinoir (pinoir.local)
+Node: pi0fr.local,  pinoir.local
     Pi Zero W. 512MB, 16GB sdhc. PCA9685 Servo controler + servos, lasers.
-Python github: 
+(Python github:)[https://github.com/ccoupe/mqtt-turret]
 MQTT:
-1. /homie/turret_back/turret_1
-2. /homie/turret_back/turret_2
+1. /homie/turret_front/turret_1
+2. /homie/turret_back/turret_1
+
+### Tracker
+Node: bronco, [opt nano]
+    Dell i7. 
+(Python github:)[https://github.com/ccoupe/tracker] ImageZMQ
+(Python github:)[https://github.com/ccoupe/target] rpyc, not used
+MQTT:
+1. /homie/turret_tracker/track/
+
+### Facial Recognition
+Node: nano
+      Nvidia Jetson Nano. 4GB, SSD.
+(Python github:)[https://github.com/ccoupe/fcrecog]
+rpyc call from trumpybear to rpc server process on port 4774
 
 ### Chimes, Siren, TTS MP3 players
-Python gitub:
+(Python gitub:)[https://github.com/ccoupe/mqtt-alarm]
+(HE Chime driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-chime.groovy]
+(HE Siren driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy]
+(HE TTS driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy]
+(HE Alarm v2.1)[https://github.com/ccoupe/hubitat/blob/master/mqtt-alarm2.groovy]
 Nodes: 
-1. lostpi.local Raspberry Pi 2. 1GB
+1. kodi.local Raspberry Pi 4. 4GB (Chime only)
 2. mini.local - Mac Mini 8GB, 1.5TB - Catalina. 
-3. bronco.local - Dell i7 8GB, 1,5TB - Mint 19.1
+3. bronco.local - Dell i7 16GB, 1,5TB - Mint 19.1
+4. trumpy4.local Raspberry Pi 4 4GB.
 MQTT:
-1. homie/lostpi/player|chime|siren|strobe
-2. homie/mini_play/player|chime|siren|strobe
-3. homie/bronco_play/player|chime|siren|strobe
-## Sequences
+1. homie/kodi_player/player|chime|siren|strobe
+2. homie/mini_player/player|chime|siren|strobe
+3. homie/bronco_player/player|chime|siren|strobe
+4. homie/trumpybear/player|chime|siren
+
+## Hubitat Rules
 
 ### HSM -> "You're Fired" Switch -> {"cmd": "begin"}
 HE Virtual switch - Used by Dashboard and HSM.
