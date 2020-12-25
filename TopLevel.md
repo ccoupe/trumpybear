@@ -189,11 +189,23 @@ is an attempt to skip certain noisy steps if the housekeeping switch is on.
 
 ## Node/Devices/Process/Topics
 ### TrumpyBear Device
+This might be the center of TrumpyBear. Mostly it's just a complicated
+state machine (or three) that knows who to call or message for action.
+
+Also, it has the mycroft code and microphone and speaker.
 #### Node: trumpy4 aka trumpy4.local
-      Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle.
-(HE Driver: Mqtt Trumpy V2)[https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy]
-(Python Github:)[https://github.com/ccoupe/trumpybear] 
-#### MQTT:  /homie/trumpy_bear/<seven devices>
+Raspberry Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle. Powered
+USB2 hub (7 ports and full)
+[https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy](HE Driver Mqtt Trumpy V2)
+[https://github.com/ccoupe/trumpybear](Github Python)
+#### MQTT:  
+1. homie/trumpy_bear/control/cmd
+2. homie/trumpy_bear/player/url
+3. homie/trumpy_bear/speech/...
+4. homie/trumpy_bear/chime
+5. homie/trumpy_bear/siren
+6. homie/trumpy_bear/stobe [unused]
+7. homie/trumpy_bear/screen 
 #### Startup
 This is complicated. TrumpyBear is a user process but `systemd --user enable`
 is troublesome for me and my Raspberry OS. It's probably me. It's also
@@ -277,8 +289,9 @@ Like the bridge and Trumpybear the launch is for user space. See trumpybear
 for the description.
 
 ### mycroft-bridge
-(Python Github)[https://github.com/ccoupe/trumpy_mycroft]
-#### MQTT:  homie/trumpy_bear/speech
+[https://github.com/ccoupe/trumpy_mycroft](Github Python)
+#### MQTT:  
+homie/trumpy_bear/speech
 There are 'ctl', 'ask', 'reply', 'say' subtopics. 
 ### mqttmycroft.service
 Like the mycroft and Trumpybear the launch is for user space. See trumpybear
@@ -298,15 +311,13 @@ for the description.
 
 ### trumpy_ranger
 #### Node: esp32 192.168.1.xx
-(Arduino C++ Github)[https://github.com/ccoupe/arduino/tree/master/ranger]
-#### MQTT: 
+[https://github.com/ccoupe/arduino/tree/master/ranger](Github Arduino C++)
 1. /homie/trumpy_ranger/autoranger
 2. /homie/trumpy_ranger/display
-
 ### Turrets
 #### Node: pi0fr.local,  pinoir.local
     Pi Zero W. 512MB, 16GB sdhc. PCA9685 Servo controler + servos, lasers.
-(Python github:)[https://github.com/ccoupe/mqtt-turret]
+[https://github.com/ccoupe/mqtt-turret](github Python)
 #### MQTT:
 1. /homie/turret_front/turret_1
 2. /homie/turret_back/turret_1
@@ -365,8 +376,8 @@ for the description.
 ### Tracker
 #### Node: bronco, [opt nano]
     Dell i7. 
-(Python github:)[https://github.com/ccoupe/tracker] ImageZMQ
-(Python github:)[https://github.com/ccoupe/target] rpyc, not used
+[https://github.com/ccoupe/tracker](Github Python) ImageZMQ
+[https://github.com/ccoupe/target](Github Python) rpyc, not used
 #### MQTT:
 1. /homie/turret_tracker/track/
 #### bronco.json
@@ -389,16 +400,16 @@ for the description.
 rpyc call from trumpybear to rpc server process on port 4774
 #### Node: nano
       Nvidia Jetson Nano. 4GB, SSD.
-(Python github:)[https://github.com/ccoupe/fcrecog]
+[https://github.com/ccoupe/fcrecog](Github Python)
 #### mlface.service
 #### mlface.sh
 
 ### Chimes, Siren, TTS MP3 players
-(Python gitub)[https://github.com/ccoupe/mqtt-alarm]
-(HE Chime driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-chime.groovy]
-(HE Siren driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy]
-(HE TTS driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy]
-(HE Alarm v2.1)[https://github.com/ccoupe/hubitat/blob/master/mqtt-alarm2.groovy]
+[https://github.com/ccoupe/mqtt-alarm](Github Python)
+[https://github.com/ccoupe/hubitat/blob/master/mqtt-chime.groovy](HE Chime driver)
+[https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy](HE Siren driver)
+[https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy](HE TTS driver)
+[https://github.com/ccoupe/hubitat/blob/master/mqtt-alarm2.groovy](HE Alarm v2.1)
 #### Nodes: 
 1. kodi.local Raspberry Pi 4. 4GB (Chime only)
 2. mini.local - Mac Mini 8GB, 1.5TB - Catalina. 
@@ -433,9 +444,10 @@ is a Shoes Ruby script. Which means you need a version of Shoes for Raspberry.
 Not a problem for me. I maintain Shoes - get your copy at walkabout.mvmanila.com
 You'll also need to install VLC.
 
-#### (Gitbub)[https://github.com/ccoupe/front_panel]
 #### Nodes
 trumpy4.local
+#### Source Code
+[https://github.com/ccoupe/front_panel](Github Ruby)
 #### MQTT
 1. "homie/trumpy_bear/screen/control/set"
 2. "homie/trumpy_bear/screen/control"
