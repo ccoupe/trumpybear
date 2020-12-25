@@ -196,9 +196,9 @@ Also, it has the mycroft code and microphone and speaker.
 #### Node: trumpy4 aka trumpy4.local
 Raspberry Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle. Powered
 USB2 hub (7 ports and full)
-[gitub](https://github.com/ccoupe/trumpybear)
-[https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy](HE Driver Mqtt Trumpy V2)
-[https://github.com/ccoupe/trumpybear](Github Python)
+
+[HE Driver Mqtt Trumpy V2](https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy)
+[Github Python](https://github.com/ccoupe/trumpybear)
 #### MQTT:  
 1. homie/trumpy_bear/control/cmd
 2. homie/trumpy_bear/player/url
@@ -215,7 +215,7 @@ auto-logged in to the GUI. For consistency we do use .services files.
 
 The systemd --user .service files are in /home/pi/.config/systemd/user but
 the real magic occurs in /etc/xdg/lxsession/LXDE-pi/autostart:
-```sh
+```txt
 @lxpanel --profile LXDE-pi
 @pcmanfm --desktop --profile LXDE-pi
 @xscreensaver -no-splash
@@ -229,7 +229,7 @@ first so it can manipulate the bluetooth settings before loading the
 mycroft-bridge. 
 
 #### trumpy.json
-'''json
+```json
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
@@ -268,7 +268,7 @@ mycroft-bridge.
     }
   ]
 }
-'''
+```
 NOTE: the `turrets` list of hashes is sent to the Front Panel (login.rb)
 where the min and max values are used.
 
@@ -290,7 +290,7 @@ Like the bridge and Trumpybear the launch is for user space. See trumpybear
 for the description.
 
 ### mycroft-bridge
-[https://github.com/ccoupe/trumpy_mycroft](Github Python)
+[Github Python](https://github.com/ccoupe/trumpy_mycroft)
 #### MQTT:  
 homie/trumpy_bear/speech
 There are 'ctl', 'ask', 'reply', 'say' subtopics. 
@@ -299,7 +299,7 @@ Like the mycroft and Trumpybear the launch is for user space. See trumpybear
 for the description.
 ### mqttmycroft.sh
 ### trumpy.json
-'''json
+```json
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
@@ -308,22 +308,41 @@ for the description.
   "bridge_ip": "192.168.1.8",
   "bridge_port": 8281
 }
-'''
+```
 
 ### trumpy_ranger
-#### Node: esp32 192.168.1.xx
-[https://github.com/ccoupe/arduino/tree/master/ranger](Github Arduino C++)
+#### Node
+esp32 192.168.1.xx. An ultrsonic range sensor and a two line LCD display.
+Can run in several modes.  One is the display instructions ('move forward' 'move back')
+on how close to get to a certain distance for a good camera picture of the face.
+
+The other mode just displays the distance.
+[Github Arduino C++](https://github.com/ccoupe/arduino/tree/master/ranger)
+#### MQTT
 1. /homie/trumpy_ranger/autoranger
 2. /homie/trumpy_ranger/display
+#### Configuration
+Done in device.h at compile time.
+
 ### Turrets
 #### Node: pi0fr.local,  pinoir.local
-    Pi Zero W. 512MB, 16GB sdhc. PCA9685 Servo controler + servos, lasers.
-[https://github.com/ccoupe/mqtt-turret](github Python)
+Pi Zero W. 512MB, 16GB sdhc. PCA9685 Servo controler + servos, lasers.
+Each turret controller could have up to 8 turrets attached (2 servos per
+turret). In practive more than one is kind of useless. 
+
+Turrets pan and tilt (aim) a laser diode to the center of a 'person' rectangle.
+The computations are different if the camera is front and a turret is front
+or back. 
+
+Turrets also have built in geometric patterns that can be called for 'drawing' like
+Zigzag sweeps, crosshair, circle and such.
+
+[github Python](https://github.com/ccoupe/mqtt-turret)
 #### MQTT:
 1. /homie/turret_front/turret_1
 2. /homie/turret_back/turret_1
 #### pi0fr.json
-'''json
+```json
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
@@ -349,9 +368,9 @@ for the description.
     }
   ]
 }
-'''
+```
 #### pinoir.json
-'''json
+```json
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
@@ -373,16 +392,16 @@ for the description.
     }
   ]
 }
-'''
+```
 ### Tracker
 #### Node: bronco, [opt nano]
     Dell i7. 
-[https://github.com/ccoupe/tracker](Github Python) ImageZMQ
-[https://github.com/ccoupe/target](Github Python) rpyc, not used
+[Github Python](https://github.com/ccoupe/tracker) ImageZMQ
+[Github Python](https://github.com/ccoupe/target) rpyc, not used
 #### MQTT:
 1. /homie/turret_tracker/track/
 #### bronco.json
-'''json
+```json
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
@@ -396,21 +415,21 @@ for the description.
   "turrets": ["homie/turret_front/turret_1/control/set",
               "homie/turret_back/turret_1/control/set"]
 }
-'''
+```
 ### Facial Recognition
 rpyc call from trumpybear to rpc server process on port 4774
 #### Node: nano
       Nvidia Jetson Nano. 4GB, SSD.
-[https://github.com/ccoupe/fcrecog](Github Python)
+[Github Python](https://github.com/ccoupe/fcrecog)
 #### mlface.service
 #### mlface.sh
 
 ### Chimes, Siren, TTS MP3 players
-[https://github.com/ccoupe/mqtt-alarm](Github Python)
-[https://github.com/ccoupe/hubitat/blob/master/mqtt-chime.groovy](HE Chime driver)
-[https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy](HE Siren driver)
-[https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy](HE TTS driver)
-[https://github.com/ccoupe/hubitat/blob/master/mqtt-alarm2.groovy](HE Alarm v2.1)
+[Github Python](https://github.com/ccoupe/mqtt-alarm)
+[HE Chime driver](https://github.com/ccoupe/hubitat/blob/master/mqtt-chime.groovy)
+[HE Siren driver](https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy)
+[HE TTS driver](https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy)
+[HE Alarm v2.1](https://github.com/ccoupe/hubitat/blob/master/mqtt-alarm2.groovy)
 #### Nodes: 
 1. kodi.local Raspberry Pi 4. 4GB (Chime only)
 2. mini.local - Mac Mini 8GB, 1.5TB - Catalina. 
@@ -422,7 +441,7 @@ rpyc call from trumpybear to rpc server process on port 4774
 3. homie/bronco_player/player|chime|siren|strobe
 4. homie/trumpybear/player|chime|siren
 #### json example
-'''json
+```json
 {
   "mqtt_server_ip": "192.168.1.7",
   "mqtt_port": 1883,
@@ -430,7 +449,7 @@ rpyc call from trumpybear to rpc server process on port 4774
   "homie_device": "mini_play",
   "homie_name": "Mac mini Mp3 Play"
 }
-'''
+```
 ### Login Panel aka Front Panel
 This is a 10" hdmi touch screen on the trumpybear pi4. Trumpybear can
 amuse or scare burglars without the touchscreen The screen app is
@@ -448,7 +467,7 @@ You'll also need to install VLC.
 #### Nodes
 trumpy4.local
 #### Source Code
-[https://github.com/ccoupe/front_panel](Github Ruby)
+[Github Ruby](https://github.com/ccoupe/front_panel)
 #### MQTT
 1. "homie/trumpy_bear/screen/control/set"
 2. "homie/trumpy_bear/screen/control"
