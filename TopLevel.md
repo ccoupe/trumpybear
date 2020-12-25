@@ -195,10 +195,25 @@ is an attempt to skip certain noisy steps if the housekeeping switch is on.
 (Python Github:)[https://github.com/ccoupe/trumpybear] 
 #### MQTT:  /homie/trumpy_bear/<seven devices>
 #### Startup
-This is complicated. TrumpyBear is a user process and systemd plus user launch
-are troublesome for me and my Raspberry OS. It's probably me. It's also
-part of the Raspbian PulseAudio problem. TB launches when the 'pi' user has
-auto-logged in to the GUI. 
+This is complicated. TrumpyBear is a user process but `systemd --user enable`
+is troublesome for me and my Raspberry OS. It's probably me. It's also
+related to the Raspbian PulseAudio problem. TB launches when the 'pi' user has
+auto-logged in to the GUI. For consistency we do use .services files.
+
+The systemd --user .service files are in /home/pi/.config/systemd/user but
+the real magic occurs in /etc/xdg/lxsession/LXDE-pi/autostart:
+```sh
+@lxpanel --profile LXDE-pi
+@pcmanfm --desktop --profile LXDE-pi
+@xscreensaver -no-splash
+systemctl --user start mqttmycroft
+systemctl --user start mycroft
+systemctl --user start tblogin
+systemctl --user start trumpy
+```
+NOTE: /usr/local/lib/mqttmycroft/mqttmycroft.sh loads first and it runs 
+first so it can manipulate the bluetooth settings before loading the 
+mycroft-bridge. 
 
 #### trumpy.json
 '''json
@@ -241,6 +256,9 @@ auto-logged in to the GUI.
   ]
 }
 '''
+NOTE: the `turrets` list of hashes is sent to the Front Panel (login.rb)
+where the min and max values are used.
+
 ### mycroft
 Mycroft is an open source digital assistant like Alexa, Google Home or Siri.
 It has skills similar to the others to extend what it can respond to. It't also
@@ -376,7 +394,7 @@ rpyc call from trumpybear to rpc server process on port 4774
 #### mlface.sh
 
 ### Chimes, Siren, TTS MP3 players
-(Python gitub:)[https://github.com/ccoupe/mqtt-alarm]
+(Python gitub)[https://github.com/ccoupe/mqtt-alarm]
 (HE Chime driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-chime.groovy]
 (HE Siren driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy]
 (HE TTS driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy]
@@ -401,8 +419,41 @@ rpyc call from trumpybear to rpc server process on port 4774
   "homie_name": "Mac mini Mp3 Play"
 }
 '''
-## Hubitat Rules
+### Login Panel aka Front Panel
+This is a 10" hdmi touch screen on the trumpybear pi4. Trumpybear can
+amuse or scare burglars without the touchscreen The screen app is
+a different process that communicated with the other devices and processes
+via MQTT. 
 
+So while it's optional it's really nice for testing and debugging because
+it knows how to talk to some internal connections. 
+
+Unlike everything else which was written in Python or Ardinuo C++, `login.rb`
+is a Shoes Ruby script. Which means you need a version of Shoes for Raspberry.
+Not a problem for me. I maintain Shoes - get your copy at walkabout.mvmanila.com
+You'll also need to install VLC.
+
+#### (Gitbub)[https://github.com/ccoupe/front_panel]
+#### Nodes
+trumpy4.local
+#### MQTT
+1. "homie/trumpy_bear/screen/control/set"
+2. "homie/trumpy_bear/screen/control"
+3. "homie/trumpy_bear/control/cmd/set"
+4. 'homie/trumpy_ranger/display/mode/set' 
+5. 'homie/trumpy_ranger/display/text/set'
+6. 'homie/turret_front/turret_1/control/set'
+7. 'homie/turret_back/turret_1/control/set'
+8. 'homie/turret_font/turret_1/control'
+9. 'homie/turret_back/turret_1/control'
+10. 'homie/housekeeping/switch/state' 
+#### tblogin.service
+See startup for TrumpyBear.
+
+## Hubitat Rules
+You are correct if you think the tangle mess of Hubitat rules, virtual switches,
+custom drivers, mqtt topics and json is barely coherent. Sometimes you just do
+what has to be done.
 ### HSM -> "You're Fired" Switch -> {"cmd": "begin"}
 HE Virtual switch - Used by Dashboard and HSM.
 Rule: `Run Trumpy Bear`
