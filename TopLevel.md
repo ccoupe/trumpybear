@@ -48,22 +48,23 @@ Hubitat Security Monitor is not an alarm system although it lind of looks like
 one and smells like one. 
 
 ## Communication. 
-MQTT is used to communicate between devices and processes and sometimes 
-intra-process. From the Hubitat point of view, integration could be done
-with a REST or websocket style interface or MQTT. I choose MQTT because
+TrumpyBear uses MQTT to communicate between HE and other outside (of HE)
+devices and processes and sometimes 
+From the Hubitat point of view, integration could be done
+with a REST or websocket interface or MQTT. I choose MQTT because
 it's a centralized interface that allows either side (client or server) to
 disappear and reappear (think of reboots and code changes). It's much simpler
 to use than HTTP and more structured than websockets. Structure is good
 until it isn't. 
 
-There are only a few places where synchronization primitives are used because most
+There are only a few places where Python synchronization primitives are used because most
 things that happen are kind of 'any time after now is fine' for scheduling and events move 
 slow enough that it's not a big deal if a video frame is dropped for example.
 
 ## Components
 As mentioned above, Trumpy Bear is large collection of devices, rules, events,
-and technologies. These will not be described in great detail - they are
-'projects' of their own. The main parts of Trumpy Bear runs on a Raspberry
+and technologies. These will not be described in great detail in this document - they are
+'projects' of their own with gritty details. The main parts of Trumpy Bear runs on a Raspberry
 pi 4  with a Touch Panel screen. Note: It does not work well on a Pi 3 - it needs
 the speed and memory of a pi4.
 
@@ -112,6 +113,8 @@ topics and payloads. I also invested in a 3D printer because there are multiple 
 cases required so all Laser parts look like something interesting. I'm working towards 
 looking menacing.
 
+There is a front turret and a back turret. 
+
 ### Display and Control
 #### Ranger
 I build a 'ranger' device from an ESP32 and Arduino Sketch (C++) that uses
@@ -132,17 +135,23 @@ alarm 'system' and you can play with the lasers too which helps with debugging a
 testing turret problems. 
 
 ### AV system (Harmony, Yamaha Reciever)
-My HE automations include Turn on/off the TV and volume control and selecting 
-Harmony 'Activities' so it's part of the performance.
+My HE automations include Turning on/off the TV and volume control and selecting 
+Harmony 'Activities' so it's part of the overall performance.
 
 ### Chimes, Siren, TTS
 The Hubitat automations also use Chimes and Sirens. I wrote some python code to
 play mp3 files on a Mac (OSX) and Linux (Ubuntu/Mint) using the attached speakers.
-Part of the performance. There is an old Pi2 I found in a drawer that run the code and
-attached to the TV (a Harmony Activity is required)
+Part of the performance. 
 
 They are also Hubitat TTS devices. No need for a Sonos if you have speakers
 connected to a computer.
+
+### Kodi
+Yes the TV has a Pi4 attached with the Kodi media server code installed as
+well as the chimes and siren code. There is is a Harmony activity to switch
+to Kodi for visuals and audio. If the turrets are actively tracking a 'perp'
+the Kodi may display the tracking pictures on the big screen while playing
+loud music.
  
 ## States and Trumpy Modes. 
 If you are thinking that there are a lot of messages flying back and forth 
@@ -187,7 +196,14 @@ What can be done is via Hubitat rules and the housekeeping switch
 Cancelling an alarm is difficult because there is no central state. There
 is an attempt to skip certain noisy steps if the housekeeping switch is on.
 
+If you login on the touch panel and your picture matches a previously 'trusted' 
+picture then you can turn off the alarm that way if talking to Alexa is
+too difficult.
+
 ## Node/Devices/Process/Topics
+Thats the overview. Phew!! Another way to look at things is
+Computer processes (programs) and the machines that run them.
+
 ### TrumpyBear Device
 This might be the center of TrumpyBear. Mostly it's just a complicated
 state machine (or three) that knows who to call or message for action.
@@ -197,8 +213,8 @@ Also, it has the mycroft code and microphone and speaker.
 Raspberry Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle. Powered
 USB2 hub (7 ports and full)
 
-[HE Driver Mqtt Trumpy V2](https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy)
-[Github Python](https://github.com/ccoupe/trumpybear)
+1. [HE Driver Mqtt Trumpy V2](https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy)
+2. [Github Python](https://github.com/ccoupe/trumpybear)
 #### MQTT:  
 1. homie/trumpy_bear/control/cmd
 2. homie/trumpy_bear/player/url
