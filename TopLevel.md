@@ -1,17 +1,20 @@
 # Trumpy Bear BAD
 ## Purpose
-The meme says "Orange Man Bad". So I built Trumpy Bear Burglar Alarm  and Distraction
+The meme says "Orange Man Bad". So I built Trumpy Bear BAD (Burglar Alarm and Distraction)
 
-Burglar Alarm or Distraction? Rube Goldberg or performance art?
+Burglar Alarm and Distraction? Rube Goldberg machine or performance art?
 Tied into Home Automation as an Alarm System but it's more than that.
 Still, an 'Alarm' System is a decent metaphor for how the system works from a
 Home automation perspective. You 'arm' and 'disarm' and 'cancel' and if
-needed the Alarm (device) goes off, say when the patio door is opened when 
+needed the Alarm goes off (fires or 'you're fired'), say when the patio door is opened when 
 the 'system' is armed. 
 
 Trumpy Bear is also a sort of entertainment device. It gives the bulglar an
 interactive multimedia experience. It pleases me to develop it. It's a show
-case of interesting tehnical things.
+case of interesting technologies like facial recognition, text to voice, 
+voice to text, MQTT, Python, Arduino and the Hubitat Elevation home automation
+hub. I've never counted the number of computers involed but it's probably 6 or
+more, each running it's little piece of whole.
 
 ### Hubitat, MQTT and HSM
 Hubitat Elevation (or HE) is a home automation product, (a hub) to control
@@ -46,16 +49,16 @@ one and smells like one.
 
 ## Communication. 
 MQTT is used to communicate between devices and processes and sometimes 
-intra-process. From the Hubitat point of view integration could be done
+intra-process. From the Hubitat point of view, integration could be done
 with a REST or websocket style interface or MQTT. I choose MQTT because
 it's a centralized interface that allows either side (client or server) to
-disappear and reappear (think pf reboots and code changes). It's much simpler
+disappear and reappear (think of reboots and code changes). It's much simpler
 to use than HTTP and more structured than websockets. Structure is good
 until it isn't. 
 
 There are only a few places where synchronization primitives are used because most
 things that happen are kind of 'any time after now is fine' for scheduling and events move 
-slow enough that it's not a big deal if a video frame is dropped.
+slow enough that it's not a big deal if a video frame is dropped for example.
 
 ## Components
 As mentioned above, Trumpy Bear is large collection of devices, rules, events,
@@ -65,8 +68,8 @@ pi 4  with a Touch Panel screen. Note: It does not work well on a Pi 3 - it need
 the speed and memory of a pi4.
 
 ### Audio
-We have to use Pulse Audio. This is not an easy fit on a Pi but it can be
-done. Note: the Dec 2020 release of Raspberry OS now uses PulseAudio. Yay!
+We have to use Pulse Audio. This is not an easy fit on a Pi before the Dec 2020 update, 
+but it can be done. 
 
 #### Speaker 
 I use a decent Bluetooth speaker. The built in audio jack of a Pi is
@@ -186,47 +189,191 @@ is an attempt to skip certain noisy steps if the housekeeping switch is on.
 
 ## Node/Devices/Process/Topics
 ### TrumpyBear Device
-Node: trumpy4 aka trumpy4.local
+#### Node: trumpy4 aka trumpy4.local
       Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle.
 (HE Driver: Mqtt Trumpy V2)[https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy]
 (Python Github:)[https://github.com/ccoupe/trumpybear] 
-MQTT:  /homie/trumpy_bear/<seven devices>
+#### MQTT:  /homie/trumpy_bear/<seven devices>
+#### Startup
+This is complicated. TrumpyBear is a user process and systemd plus user launch
+are troublesome for me and my Raspberry OS. It's probably me. It's also
+part of the Raspbian PulseAudio problem. TB launches when the 'pi' user has
+auto-logged in to the GUI. 
+
+#### trumpy.json
+'''json
+{
+  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "trumpy_bear1",
+  "homie_device": "trumpy_bear",
+  "homie_name": "Trumpy Bear Pi3",
+  "camera_number": 0,
+  "camera_topic": "trumpy_cam",
+  "mycroft_ip": "192.168.1.10",
+  "ranger_mode": "once",
+  "face_server_ip": "192.168.1.4",
+  "face_port": 4774,
+  "ml_algo": "Cnn_Shapes",
+  "confidence": 0.4,
+  "ml_server_ip": "192.168.1.2",
+  "ml_port": 4783,
+  "use_ml": "remote_zmq",
+  "turrets": [
+    {
+	"name": "Front Center",
+	"topic": "homie/turret_front/turret_1/control",
+    "front": true,
+	"pan_min": 51,
+	"pan_max": 150,
+	"tilt_min": 70,
+    "tilt_max": 120
+    },
+    {
+	"name": "Left Back",
+	"topic": "homie/turret_back/turret_1/control",
+    "front": false,
+	"pan_min": 60,
+	"pan_max": 180,
+	"tilt_min": 80,
+	"tilt_max": 120
+    }
+  ]
+}
+'''
+### mycroft
+Mycroft is an open source digital assistant like Alexa, Google Home or Siri.
+It has skills similar to the others to extend what it can respond to. It't also
+has a REST and/or Websocket API. In our case, the Trumpybear skill constrains
+what mycroft can do - we want the text to speech and speech to text and limited
+skill matching but not the 'general' purpose skill matching. Until we want the 
+general.
+### /home/pi/mycroft-core
+This is where I `git clone`d mycroft. Git is not the optimal choice because
+mycroft has a way of unwanted changing on us because its startup checks
+git. '''/opt/mycroft/skills'' in particular need locking down or it will delete our
+special sauce. 
+### Github
+### mycroft.service
+Like the bridge and Trumpybear the launch is for user space. See trumpybear
+for the description.
 
 ### mycroft-bridge
-(Python Github:)[https://github.com/ccoupe/trumpy_mycroft]
-MQTT:  hides in /homie/trumpy_bear/xxxxxx
-
-### mycroft
-### Python github:
+(Python Github)[https://github.com/ccoupe/trumpy_mycroft]
+#### MQTT:  homie/trumpy_bear/speech
+There are 'ctl', 'ask', 'reply', 'say' subtopics. 
+### mqttmycroft.service
+Like the mycroft and Trumpybear the launch is for user space. See trumpybear
+for the description.
+### mqttmycroft.sh
+### trumpy.json
+'''json
+{
+  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "trumpy_bridge",
+  "homie_device": "trumpy_bear",
+  "bridge_ip": "192.168.1.8",
+  "bridge_port": 8281
+}
+'''
 
 ### trumpy_ranger
-Node: esp32 192.168.1.xx
-(Arduino C++ Github:)[https://github.com/ccoupe/arduino/tree/master/ranger]
-MQTT: 
+#### Node: esp32 192.168.1.xx
+(Arduino C++ Github)[https://github.com/ccoupe/arduino/tree/master/ranger]
+#### MQTT: 
 1. /homie/trumpy_ranger/autoranger
 2. /homie/trumpy_ranger/display
 
 ### Turrets
-Node: pi0fr.local,  pinoir.local
+#### Node: pi0fr.local,  pinoir.local
     Pi Zero W. 512MB, 16GB sdhc. PCA9685 Servo controler + servos, lasers.
 (Python github:)[https://github.com/ccoupe/mqtt-turret]
-MQTT:
+#### MQTT:
 1. /homie/turret_front/turret_1
 2. /homie/turret_back/turret_1
-
+#### pi0fr.json
+'''json
+{
+  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "turret_front",
+  "homie_device": "turret_front",
+  "homie_name": "Pi 0w Front Laser Turrets",
+  "turrets": [
+    {
+	"position": "fc",
+        "hw": true,
+        "laser_pin" : 17,
+        "pan_pin": 0,
+        "tilt_pin": 1,
+	"delay": 0.25,
+	"pan_min": 45,
+	"pan_max": 140,
+	"tilt_min": 70,
+	"tilt_max": 120,
+	"pant_min": 51,
+	"pant_max": 150,
+	"tiltt_min": 70,
+	"tiltt_max": 120
+    }
+  ]
+}
+'''
+#### pinoir.json
+'''json
+{
+  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "turret_back",
+  "homie_device": "turret_back",
+  "homie_name": "Pi 0w Laser Turrets",
+  "turrets": [
+    {
+	"position": "br",
+        "hw": true,
+        "laser_pin" : 17,
+        "pan_pin": 0,
+        "tilt_pin": 1,
+	"delay": 0.25,
+	"pan_min": 40,
+	"pan_max": 180,
+	"tilt_min": 90,
+	"tilt_max": 140
+    }
+  ]
+}
+'''
 ### Tracker
-Node: bronco, [opt nano]
+#### Node: bronco, [opt nano]
     Dell i7. 
 (Python github:)[https://github.com/ccoupe/tracker] ImageZMQ
 (Python github:)[https://github.com/ccoupe/target] rpyc, not used
-MQTT:
+#### MQTT:
 1. /homie/turret_tracker/track/
-
+#### bronco.json
+'''json
+{
+  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "tracker_1",
+  "homie_device": "turret_tracker",
+  "homie_name": "Shape tracker for turrets",
+  "image_port": 4783,
+  "confidence": 0.40,
+  "provide_rtsp": false,
+  "http_port": 5000,
+  "turrets": ["homie/turret_front/turret_1/control/set",
+              "homie/turret_back/turret_1/control/set"]
+}
+'''
 ### Facial Recognition
-Node: nano
+rpyc call from trumpybear to rpc server process on port 4774
+#### Node: nano
       Nvidia Jetson Nano. 4GB, SSD.
 (Python github:)[https://github.com/ccoupe/fcrecog]
-rpyc call from trumpybear to rpc server process on port 4774
+#### mlface.service
+#### mlface.sh
 
 ### Chimes, Siren, TTS MP3 players
 (Python gitub:)[https://github.com/ccoupe/mqtt-alarm]
@@ -234,17 +381,26 @@ rpyc call from trumpybear to rpc server process on port 4774
 (HE Siren driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-siren.groovy]
 (HE TTS driver)[https://github.com/ccoupe/hubitat/blob/master/mqtt-tts.groovy]
 (HE Alarm v2.1)[https://github.com/ccoupe/hubitat/blob/master/mqtt-alarm2.groovy]
-Nodes: 
+#### Nodes: 
 1. kodi.local Raspberry Pi 4. 4GB (Chime only)
 2. mini.local - Mac Mini 8GB, 1.5TB - Catalina. 
 3. bronco.local - Dell i7 16GB, 1,5TB - Mint 19.1
 4. trumpy4.local Raspberry Pi 4 4GB.
-MQTT:
+#### MQTT:
 1. homie/kodi_player/player|chime|siren|strobe
 2. homie/mini_player/player|chime|siren|strobe
 3. homie/bronco_player/player|chime|siren|strobe
 4. homie/trumpybear/player|chime|siren
-
+#### json example
+'''json
+{
+  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "mini_play1",
+  "homie_device": "mini_play",
+  "homie_name": "Mac mini Mp3 Play"
+}
+'''
 ## Hubitat Rules
 
 ### HSM -> "You're Fired" Switch -> {"cmd": "begin"}

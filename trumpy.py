@@ -1013,7 +1013,7 @@ def begin_tracking(min=0.5, debug=False):
   video_dev = cv2.VideoCapture(settings.local_cam)
   video_dev.set(3, 640)
   video_dev.set(4, 480)
-  hmqtt.tracker(json.dumps({'begin':True}))
+  hmqtt.tracker(json.dumps({'begin':True, 'debug': debug}))
   time.sleep(2) # 2 sec for camera to settle and for server to set up
   try:
     if settings.use_ml == 'remote_zmq': 
