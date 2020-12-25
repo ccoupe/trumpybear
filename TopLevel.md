@@ -196,6 +196,7 @@ Also, it has the mycroft code and microphone and speaker.
 #### Node: trumpy4 aka trumpy4.local
 Raspberry Pi4 4GB. 128GB SSD, HMDI Touch Screen, USB sound dongle. Powered
 USB2 hub (7 ports and full)
+[gitub](https://github.com/ccoupe/trumpybear)
 [https://github.com/ccoupe/hubitat/blob/master/mqtt-trumpy.groovy](HE Driver Mqtt Trumpy V2)
 [https://github.com/ccoupe/trumpybear](Github Python)
 #### MQTT:  
