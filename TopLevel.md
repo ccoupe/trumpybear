@@ -498,6 +498,34 @@ trumpy4.local
 #### tblogin.service
 See startup for TrumpyBear.
 
+### Kodi
+As well as running the Kodi media server, the node also runs the code
+for HE chime,siren and TTS. And it knows how to display the near realtime
+video of the tracker's camera just the laser turrets use that view.
+#### Node
+kodi.local - raspberry Pi 4. 4GB, 64GB sdhc. 
+#### Source
+#### MQTT
+Listens on homie/turret_tracker/track/control/set for a {"uri": ..}
+#### Startup via kodi.service
+```txt
+[Unit]
+Description=Kodi
+After=network.target
+
+[Service]
+User=pi
+Group=pi
+Type=simple
+ExecStart=/usr/bin/kodi
+Restart=on-abort
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
 ## Hubitat Rules
 You are correct if you think the tangle mess of Hubitat rules, virtual switches,
 custom drivers, mqtt topics and json is barely coherent. Sometimes you just do
