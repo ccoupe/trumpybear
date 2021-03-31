@@ -264,7 +264,7 @@ class Homie_MQTT:
   def set_status(self, str):
     self.client.publish(self.state_pub, str)
         
-  # these use the bridge to talk to mycroft
+  # These use the bridge to talk to mycroft
   def speak(self, str):
     self.client.publish(self.hsay_pub, str)
 
@@ -277,7 +277,7 @@ class Homie_MQTT:
   def tts_mute(self):
     self.client.publish(self.hctl_pub, 'off')
       
-  # these talk to the trumpy_ranger device/node
+  # These talk to the trumpy_ranger device/node
   def display_cmd(self, st):
     self.client.publish(self.hdspcmd, st)
     
@@ -290,17 +290,22 @@ class Homie_MQTT:
   def ranger_mode(self, str):
     self.client.publish(self.hrgrmode, str)
   
-  # Hubitat specific
-  def enable_player(self):
+  # Hubitat Device(s) are listening on these topics
+  def start_music_alarm(self):
+    # self.hEnbl_pub = "homie/trumpy_enable/switch/state"
+    # It's 'Trumpy Enable Alarm', a Virtual Switch which
+    # triggers the 'Trumpy Music' rule
     self.client.publish(self.hEnbl_pub, "on")
       
   def login(self, json):
+    # self.hscn_pub = 'homie/trumpy_bear/screen/control/set'
     self.client.publish(self.hscn_pub,json) 
     
   def cops_arrive(self):
+    # self.hCops_pub = 'homie/trumpy_cops/switch/state'
     self.client.publish(self.hCops_pub, 'on')
     
-  # yet another thing to talk to
+  # Yet another thing to talk to. Target Tracker.
   def tracker(self, json):
     self.client.publish('homie/turret_tracker/track/control/set', json)
 

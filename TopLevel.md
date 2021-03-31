@@ -530,6 +530,21 @@ WantedBy=multi-user.target
 You are correct if you think the tangle mess of Hubitat rules, virtual switches,
 custom drivers, mqtt topics and json is barely coherent. Sometimes you just do
 what has to be done.
+
+### Cancel Alarm
+This is a nasty problem that mostly works. Remember, it's hard to know what
+state the whole system is in. For one, there are no declared or defined states. 
+If you login to the front panel there is a button to turn off the alarm.
+There is, or could be a Trumpy Bear button on a Hubitat dashboard that will initiate
+a cancel. It works by sending a {"cmd": "end"} json payload to mqtt topic 
+homie/trumpy_bear/control/cmd . That will interrupt the internal state machine
+of trumpy.py so interactions should stop. It also causes some Hubitat Rules to
+fire - 'Cancel Alarms' There could be other ways - an virtual switch exposed
+to Alexa or a Keypad or Physical Button with a rule to push the Trumpy Bear button.
+
+Note: it's the only button for Trumpy Bear and it is not intutive how
+switch and button relate.
+
 ### HSM -> "You're Fired" Switch -> {"cmd": "begin"}
 HE Virtual switch - Used by Dashboard and HSM.
 Rule: `Run Trumpy Bear`

@@ -68,7 +68,7 @@ class TrumpyBear:
     while len(fns) > 4:
       fn = fns.pop(0)
       self.log.info(f'trimming {self.name}/face/{fn}')
-      os.remove(f'/home/pi/.trumpybear/{self.name}/face/{fn}')
+      os.remove(f'{self.db_path}/{self.name}/face/{fn}')
       
     return
     

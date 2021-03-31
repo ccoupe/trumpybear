@@ -306,14 +306,18 @@ def tame_machine(evt, arg=None):
     next_state = cur_state    
   elif evt == Event.abort:
     next_state = State.starting
+  elif evt == Event.reply or evt == Event.pict:
+    next_state = State.starting
   else:
-    applog.info('unknown state for tame mode')
+    applog.info(f'unknown {evt} for tame mode')
+    next_state = State.starting
   trumpy_state = next_state
   applog.debug("Tm exit {} {} => {}".format(cur_state, evt, trumpy_state))
   
   # unlock machine - now we can call long running things
   sm_lock.release()
   if trumpy_state == State.role_dispatch:
+    # should not happen? 
     applog.info('tame: mic on')
     hmqtt.tts_unmute()
     tame_mycroft()
@@ -354,10 +358,12 @@ def mean_machine(evt, arg=None):
       if len(flds) == 2: arg = flds[1]
     else:
       applog.warn("null arg")
-    if trumpy_state == State.aborting:
+    if trumpy_state == State.aborting or trumpy_state == State.initialized:
       # This can happen when the switch is turned off and mycroft is
       # interacting (publishing to reply/set)
+      applog.info('swallowing Event.reply in State.aborting')
       next_state = State.aborting
+      #pass
     elif trumpy_state == State.waitname:
       # have a name. Maybe.
       if arg == None or arg == '':   
@@ -417,6 +423,11 @@ def mean_machine(evt, arg=None):
     else:
       applog.debug('no handler in {} for {}'.format(trumpy_state, evt))
   elif evt == Event.pict:
+    if trumpy_state == State.aborting or trumpy_state == State.initialized:
+      # This can happen when the picture is canceled by user action
+      # interacting (publishing to reply/set)
+      applog.info('swallowing Event.reply in State.aborting')
+      next_state = State.aborting
     if trumpy_state == State.waitface:
       hmqtt.start_ranger(0);
       trumpy_bear.face_path = "/var/www/camera/face.jpg"
@@ -475,7 +486,7 @@ def mean_machine(evt, arg=None):
   sm_lock.release()
   if trumpy_state == State.aborting:
     trumpy_state = State.initialized
-    interaction_finished()
+    interaction_canceled()
   if trumpy_state == State.role_dispatch:
     trumpy_state = State.initialized
     role_dispatch(trumpy_bear)
@@ -718,6 +729,14 @@ def interaction_finished():
   if state_machine == mean_machine:
     hmqtt.cops_arrive()
   new_sm(tame_machine)
+  
+def interaction_canceled():
+  global hmqtt, warning_level, state_machine
+  applog.info('canceled interaction')
+  hmqtt.tts_mute()
+  hmqtt.display_cmd('off')
+  hmqtt.set_status('ready')
+  new_sm(tame_machine)
 
 def begin_mycroft():
   global hmqtt, applog
@@ -746,9 +765,9 @@ def begin_rasa(tb):
 def begin_intruder():
   global applog, hmqtt
   applog.info('begin intruder')
-  hmqtt.enable_player()      # sets mqtt switch to wake up a HE RM rule
+  hmqtt.start_music_alarm()      # sets mqtt switch to wake up a HE rule
   hmqtt.display_text("Lasers are Tracking")
-  begin_tracking(2, False);
+  begin_tracking(2, False, False);
   print('exiting intruder')
   long_timer(2)
 
@@ -885,7 +904,7 @@ def trumpy_recieve(jsonstr):
   elif cmd == 'register':
     wakeup_register()
   elif cmd == 'end':
-    # kill and reset
+    # abort and reset. Hubitat can do this in a number of ways. 
     state_machine(Event.abort)
   elif cmd == 'capture_done':
     if state_machine is None:
@@ -899,8 +918,9 @@ def trumpy_recieve(jsonstr):
   elif cmd == 'track':
     try:
       dbg = rargs.get('debug',False)
+      test = rargs.get('test',False)
       applog.info('calling begin_tracking')
-      begin_tracking(1, dbg)
+      begin_tracking(2, dbg, test)
     except:
       traceback.print_exc()
   elif cmd == 'calib':
@@ -965,10 +985,9 @@ def motion_track_rpc(display):
   video_dev.release()
   
 
-def motion_track_zmq(display):
+def motion_track_zmq(display, panel):
   global tracking_stop_flag, video_dev, zmqsender, applog
   global settings
-  # camera warmup time:
   applog.info('motion_track_zmq called')
   time.sleep(1)
   jpeg_quality = 95
@@ -998,22 +1017,22 @@ def motion_track_zmq(display):
   zmqsender.close()
   video_dev.release()
   
-def tracking_timer(min=5):
+def tracking_timer(min=5,testing=False):
   print('creating tracking timer')
-  tracking_thread = threading.Timer(min * 60, tracking_finished)
+  tracking_thread = threading.Timer(min * 60, tracking_finished, args=(testing,))
   tracking_thread.start()
 
 zmqsender = None
 
 # it gets complicated. we need some time for the server to get
 # cranking
-def begin_tracking(min=0.5, debug=False):
+def begin_tracking(min=0.5, debug=False, test=False):
   global hmqtt, applog, settings, tracking_stop_flag, video_dev
   # open the camera 
   video_dev = cv2.VideoCapture(settings.local_cam)
   video_dev.set(3, 640)
   video_dev.set(4, 480)
-  hmqtt.tracker(json.dumps({'begin':True, 'debug': debug}))
+  hmqtt.tracker(json.dumps({'begin':True, 'debug': debug, 'panel': test}))
   time.sleep(2) # 2 sec for camera to settle and for server to set up
   try:
     if settings.use_ml == 'remote_zmq': 
@@ -1022,24 +1041,23 @@ def begin_tracking(min=0.5, debug=False):
       #zmqsender = imagezmq.ImageSender(connect_to='tcp://192.168.1.2:4783')
       zmqsender = imagezmq.ImageSender(connect_to=uri)
       
-    applog.info("in begin tracking")
+    applog.info("trumpy begin tracking thread")
     tracking_stop_flag = False
-    tracking_timer(min)
+    tracking_timer(min, testing=test)
     if settings.use_ml == 'remote_rpc':
-      trk_thread = Thread(target=motion_track_rpc, args=(debug,))
+      trk_thread = Thread(target=motion_track_rpc, args=(debug,test))
     elif settings.use_ml == 'remote_zmq':
-      trk_thread = Thread(target=motion_track_zmq, args=(debug,))
+      trk_thread = Thread(target=motion_track_zmq, args=(debug,test))
     trk_thread.start()
   except:
     traceback.print_exc()
   
-def tracking_finished():
-  global tracking_stop_flag, applog, video_dev, hmqtt, zmqsender
+def tracking_finished(test):
+  global tracking_stop_flag, applog, settings, hmqtt
   tracking_stop_flag = True
   applog.info('tracking timer fired')
-  pt = {'power': 0}
-  hmqtt.client.publish('homie/turret_front/turret_1/control/set', json.dumps(pt))
-  hmqtt.tracker(json.dumps({'end':True}))
+  hmqtt.tracker(json.dumps({'end':True,'panel':test}))
+
     
 def calib_machine(evt, arg=None):
   global sm_lock, trumpy_state, calib_distance
@@ -1066,10 +1084,13 @@ def begin_calibrate(meters, secs):
   global settings, hmqtt, video_dev, applog, state_machine, ml_dict
   # create directory for 'meters' arg. Holds pict<n>.jpg and data.csv
   # files. 
+  if settings.local_cam is None:
+    applog.warn('The camera must be owned by TrumpyBear')
+    return
   from os import path
-  path  = f'/home/pi/.calib/{meters}M'
-  #if path.exists(path):
-  #  shutil.rmtree(path)
+  path  = f'{os.getenv("HOME")}/.calib/{meters}M'
+  if os.path.isdir(path):
+    shutil.rmtree(path)
   os.makedirs(path)
   csv_path = f'{path}/data.csv'
   csvf = open(csv_path, mode='w')
