@@ -28,6 +28,11 @@ import numpy as np
 import cv2
 import imutils
 from imutils.video import VideoStream
+# Face Recognition uses
+import websocket  # websocket-client
+import base64
+
+# Tracking uses:
 import imagezmq
 import rpyc
 
@@ -264,12 +269,12 @@ def main():
     applog.info(f'Using local camera: {settings.local_cam}')
     video_dev = cv2.VideoCapture(settings.local_cam)
     video_dev.release()
-    
+  '''  
   # connect to the face recogition server
   face_proxy = rpyc.connect(settings.face_server_ip, settings.face_port, 
           #config={'allow_all_attrs': True})
           config={'allow_all_attrs': True, 'allow_public_attrs': True})
-          
+  '''
   # setup ml_dict for shape detector(s)
   ml_dict = build_ml_dict(settings)
   
@@ -774,12 +779,45 @@ def begin_intruder():
 # return name string or None for the picture (path) in 
 # TrumpyBear object.
 def do_recog(tb):
-  global face_proxy
+  global face_proxy, applog
   applog.debug(f'get_face_name {tb.face_path}')
   bfr = open(tb.face_path, 'rb').read()
-  # call remote
+  # Use websocket-client
+  try:
+    ws = websocket.WebSocket()
+    try:
+      uri = f'ws://{settings.face_server_ip}:{settings.face_port}'
+      ws.connect(uri)
+    except ConnectionRefusedError:
+      applog.warning('Fail Over to backup')
+      try:
+        uri = f'ws://{settings.backup_ip}:{settings.face_port}'
+        ws.connect(uri)
+      except ConnectionRefusedError:
+        applog.warning('FAIL to connect')
+        return []
+        
+    ws.send(base64.b64encode(bfr))
+    reply = ws.recv()
+    ws.close()
+
+    js = json.loads(reply)
+    details = js['details']
+    mats = details['matrices']
+    names = []
+    for i in range(len(mats)):
+      names.append(mats[i]['tag'])
+    if len(names) == 0:
+      names = [None]
+    return names[0]
+  except:
+    applog('Major Fail on websocket')
+    
+'''
+  # call remote port 4774
   result = face_proxy.root.face_recog(bfr)
   return result
+'''
 
 def save_recog(tb):
   global face_proxy
