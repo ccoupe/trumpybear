@@ -110,7 +110,9 @@ class Homie_MQTT:
     # control node
     self.publish_structure("homie/"+hdevice+"/control/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/control/$type", "controller")
-    self.publish_structure("homie/"+hdevice+"/control/$properties","cmd")
+    #self.publish_structure("homie/"+hdevice+"/control/$properties","cmd")
+    self.client.publish("homie/"+hdevice+"/control/$properties","cmd", qos=1, retain=False)
+    
     #  cmd Property of 'control'
     self.publish_structure("homie/"+hdevice+"/control/cmd/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/control/cmd/$datatype", "string")

@@ -1,8 +1,22 @@
 #!/usr/bin/env python3
-#
-# Trumpybear is multi-threaded. MQTT message handler will run code in
-# this file under a different thread. The siren/alarm/tts are rentrant since
-# they can be stopped by another thread (mqtt message)
+'''
+  Trumpybear is multi-threaded.   MQTT message handlers will run code in
+  different threads. The siren/alarm/tts are also rentrant since
+  they can be stopped by another thread (mqtt message)
+  JSON is usually sent and received from the mqtt broker topics.
+  
+  The front panel is a separate GUI program that uses MQTT to manage trumpybear
+  manual control and tests. It is not synchronously coupled but does rely the
+  state machines. There are state machines for 'normal', 'register', and ' '
+  modes.  Hubitat (and Alexa via Hubitat) is also listening to the mqtt topics and
+  sending some messages.  We don't know and cant know who sent the message
+  (use mosquitto_pub cli for debugging, eh?).
+  
+  Mycroft interactions are also through MQTT (and a proxy program too)
+  
+  Remember - it's trumpybear. It doesn't need to be perfect - no one is 
+  going to look at the code. Right? 
+'''
 import paho.mqtt.client as mqtt
 import sys
 import json
@@ -33,7 +47,8 @@ import websocket  # websocket-client
 import base64
 
 # Tracking uses:
-import imagezmq
+from lib.ImageZMQ import imagezmq
+import zmq
 import rpyc
 
 # globals
@@ -56,6 +71,11 @@ ml_dict = {}
 play_mp3 = False
 player_obj = None
 zmqsender = None
+
+class NuclearOption(Exception):
+  pass
+  
+
 
 def mp3_player(fp):
   global player_obj, applog, audiodev
@@ -776,25 +796,50 @@ def begin_intruder():
   print('exiting intruder')
   long_timer(2)
 
+
 # return name string or None for the picture (path) in 
 # TrumpyBear object.
 def do_recog(tb):
-  global face_proxy, applog
+  global face_proxy, applog, settings
   applog.debug(f'get_face_name {tb.face_path}')
   bfr = open(tb.face_path, 'rb').read()
-  # Use websocket-client
+  # Use websocket-client, find one that is up and running.
+  ws = websocket.WebSocket()
+  for ip in settings.face_server_ip:
+    try:
+      uri = f'ws://{ip}:{settings.face_port}'
+      applog.debug(f'do_recog() trying {ip}')
+      ws.connect(uri, timeout=1)
+      break
+    except ConnectionRefusedError:
+      applog.warning(f'Fail {ip} Switching to next backup')
+
+  ws.send(base64.b64encode(bfr))
+  reply = ws.recv()
+  ws.close()
+
+  js = json.loads(reply)
+  details = js['details']
+  mats = details['matrices']
+  names = []
+  for i in range(len(mats)):
+    names.append(mats[i]['tag'])
+  if len(names) == 0:
+    names = [None]
+  return names[0]
+  '''
   try:
     ws = websocket.WebSocket()
     try:
       uri = f'ws://{settings.face_server_ip}:{settings.face_port}'
       ws.connect(uri)
     except ConnectionRefusedError:
-      applog.warning('Fail Over to backup')
+      applog.warning(f'Fail {settings.face_server_ip} Switching to backup')
       try:
         uri = f'ws://{settings.backup_ip}:{settings.face_port}'
         ws.connect(uri)
       except ConnectionRefusedError:
-        applog.warning('FAIL to connect')
+        applog.warning(f'Backup {settings.backup_ip} FAIL to connect')
         return []
         
     ws.send(base64.b64encode(bfr))
@@ -812,7 +857,7 @@ def do_recog(tb):
     return names[0]
   except:
     applog('Major Fail on websocket')
-    
+'''    
 '''
   # call remote port 4774
   result = face_proxy.root.face_recog(bfr)
@@ -1022,6 +1067,21 @@ def motion_track_rpc(display):
   applog.info(f'ending rpc loop {cnt} frames {cnt/120} fps for {hits}')
   video_dev.release()
   
+'''
+Zmq Trickiness: We can't detect that the zmq 'hub' is not answering
+until we try to send to it AND it times out. Then we can try a different
+Server. The working tracker will notify Kodi or Front Panel mpeg playes
+so we don't have to do that here.
+
+Beware: The tracker(s) are listening on a mqtt topic so they will both run
+AND they will init and wait in their respective create_stream(). If they are both running
+only the first will be sent images. If the first one doesn't respond then
+the second one will be sent the images. This COULD leave a clean up problem.
+
+
+'''
+zmqsender = None
+zmqSenderIdx = 0
 
 def motion_track_zmq(display, panel):
   global tracking_stop_flag, video_dev, zmqsender, applog
@@ -1036,19 +1096,16 @@ def motion_track_zmq(display, panel):
       applog.info('failed camera read')
       continue
     cnt += 1
-    try:
-      ret_code, jpg_buffer = cv2.imencode(
+    ret_code, jpg_buffer = cv2.imencode(
             ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+    try:
       zmqsender.send_jpg('trumpy4', jpg_buffer)
-    except:
-      applog.info(f'failed sending frame# {cnt} {len(jpg_buffer)}')
+    except (zmq.ZMQError, zmq.ContextTerminated):
+      # Todo: try the next zmq hub. Will drop the frame.
+      set_zmqSender()
+      applog.info(f'failed sending frame# {cnt} trying next server')
       traceback.print_exc()
-    '''
-    try: 
-      zmqsender.send_image('trumpy4', frame)
-    except:
-      applog.info('failed to send image')
-    '''
+      
     #applog.info(f'sent {cnt}')
   
   applog.info(f'closing image socket, {cnt} , {cnt/120} fps')
@@ -1060,7 +1117,36 @@ def tracking_timer(min=5,testing=False):
   tracking_thread = threading.Timer(min * 60, tracking_finished, args=(testing,))
   tracking_thread.start()
 
-zmqsender = None
+'''
+def pick_imagezmq(ips, port):
+  global applog
+  # returns open and workable zeromq sender given list to try
+  for ip in ips:
+    try:
+      uri = f'tcp://{ip}:{port}'
+      applog.info(f'trying tracker at {uri}')
+      zmq = imagezmq.ImageSender(connect_to=uri)
+      applog.info(f'connected to {uri}')
+      return zmq
+    except (KeyboardInterrupt, SystemExit):
+      return nil  # Ctrl-C was pressed to end program
+    except  Exception as ex: 
+      applog.debug('its a', ex)
+      traceback.print_exc()
+      continue
+'''
+def set_zmqSender():
+  global settings, zmqsender, zmqSenderIdx
+  if zmqSenderIdx < len(settings.zmq_tracker_ip):
+    uri = f'tcp://{settings.zmq_tracker_ip[zmqSenderIdx]}:{settings.zmq_port}'
+    applog.info(f'trying tracker at {uri}')
+    zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=100, recv_timeout=100)
+    zmqSenderIdx += 1
+    return 
+  else:
+    # out of servers to try.
+    raise NuclearOption
+    
 
 # it gets complicated. we need some time for the server to get
 # cranking
@@ -1070,14 +1156,20 @@ def begin_tracking(min=0.5, debug=False, test=False):
   video_dev = cv2.VideoCapture(settings.local_cam)
   video_dev.set(3, 640)
   video_dev.set(4, 480)
+  # TODO: move hmqtt.tracker() call to inside zmqSender() ? 
   hmqtt.tracker(json.dumps({'begin':True, 'debug': debug, 'panel': test}))
   time.sleep(2) # 2 sec for camera to settle and for server to set up
   try:
     if settings.use_ml == 'remote_zmq': 
-      global zmqsender
+      global zmqsender, zmqSenderIdx
+      '''
       uri = f'tcp://{settings.ml_server_ip}:{settings.ml_port}'
       #zmqsender = imagezmq.ImageSender(connect_to='tcp://192.168.1.2:4783')
       zmqsender = imagezmq.ImageSender(connect_to=uri)
+      '''
+      zmqSenderIdx = 0;
+      set_zmqSender();
+      #zmqsender = pick_imagezmq(settings.zmq_tracker_ip, settings.zmq_port)
       
     applog.info("trumpy begin tracking thread")
     tracking_stop_flag = False

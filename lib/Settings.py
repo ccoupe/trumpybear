@@ -60,19 +60,24 @@ class Settings:
     self.camera_topic = conf.get('camera_topic', 'trumpy_cam')
     if self.local_cam != None:
       self.camera_topic = None
-    self.face_server_ip = conf.get('face_server_ip', '192.168.1.2')
+    self.face_server_ip = conf.get('face_server_ip', ['192.168.1.2'])
     self.face_port = conf.get('face_port', 4785)
-    self.backup_ip = conf.get('backup_ip', '192.168.1.4')
+    #self.backup_ip = conf.get('backup_ip', '192.168.1.4')
     self.db_path = conf.get('db_path', self.db_path)
     self.ranger_mode = conf.get('ranger_mode', None)
     self.ml_algo = conf.get('ml_algo', 'Cnn_Shapes')
     self.confidence = conf.get('confidence', 0.4)
-    self.ml_server_ip = conf.get('ml_server_ip', '192.168.1.4')
+    #self.ml_server_ip = conf.get('ml_server_ip', '192.168.1.4')
+    self.zmq_tracker_ip = conf.get('zmq_tracker_ip', ['192.168.1.4'])
     self.use_ml = conf.get('use_ml', None)
+    '''
     if self.use_ml == 'remote_rpc':
       self.ml_port = conf.get("ml_port", 5266)
     elif self.use_ml == 'remote_zmq':
-      self.ml_port = conf.get("ml_port", 4783)
+      self.zmq_port = conf.get("zmq_port", 4783)
+    '''
+    if self.use_ml == 'remote_zmq':
+      self.zmq_port = conf.get("zmq_port", 4783)
     self.turrets = conf.get('turrets', None)
 
   def print(self):
@@ -91,14 +96,14 @@ class Settings:
     st['mycroft_ip'] = self.mycroft_ip
     st['face_server_ip'] = self.face_server_ip
     st['face_port'] = self.face_port
-    st['backup_ip'] = self.backup_ip
+    #st['backup_ip'] = self.backup_ip
     st['db_path'] = self.db_path
     st['ranger_mode'] = self.ranger_mode
     st['camera_number'] = self.local_cam
     st['ml_algo'] = self.ml_algo 
     st['confidence']= self.confidence
-    st['ml_server_ip'] = self.ml_server_ip 
-    st["ml_port"] = self.ml_port
+    st['zmq_tracker_ip'] = self.zmq_tracker_ip 
+    st["zmq_port"] = self.zmq_port
     st['use_ml'] = self.use_ml
     st['turrets'] = self.turrets
     str = json.dumps(st)
