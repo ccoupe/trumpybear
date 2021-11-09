@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# trumpy.py TrumpyBear.
 '''
   Trumpybear is multi-threaded.   MQTT message handlers will run code in
   different threads. The siren/alarm/tts are also rentrant since
@@ -7,7 +7,7 @@
   
   The front panel is a separate GUI program that uses MQTT to manage trumpybear
   manual control and tests. It is not synchronously coupled but does rely the
-  state machines. There are state machines for 'normal', 'register', and ' '
+  state machines. There are state machines for 'normal', 'register', and 'mean'
   modes.  Hubitat (and Alexa via Hubitat) is also listening to the mqtt topics and
   sending some messages.  We don't know and cant know who sent the message
   (use mosquitto_pub cli for debugging, eh?).
@@ -28,13 +28,13 @@ from threading import Lock, Thread
 import socket
 import os
 import shutil
+import traceback
 from subprocess import Popen
 from lib.Settings import Settings
 from lib.Homie_MQTT import Homie_MQTT
 from lib.Audio import AudioDev
 from lib.Constants import State, Event, Role
 from lib.TrumpyBear import TrumpyBear
-from lib.Algo import Algo
 import urllib.request
 import logging
 import logging.handlers
@@ -49,7 +49,6 @@ import base64
 # Tracking uses:
 from lib.ImageZMQ import imagezmq
 import zmq
-import rpyc
 
 # globals
 settings = None
@@ -59,14 +58,12 @@ applog = None
 trumpy_state = None
 trumpy_bear = None    # object of class TrumpyBear
 sm_lock = Lock()      # state machine lock - only one thread at a time
-face_proxy = None
 waitcnt = 0
 timerl_thread = None
 registering = False
 state_machine = None
 video_dev = None
 active_timer = None
-ml_dict = {}
 
 play_mp3 = False
 player_obj = None
@@ -212,7 +209,7 @@ def chimeCb(msg):
     applog.info('chime finished')
   
     
-# TODO: order Lasers with pan/tilt motors. ;-)       
+# TODO: order Lasers with pan/tilt motors. Like the turrets? ;-)       
 def strobeCb(msg):
   global applog, hmqtt
   applog.info(f'missing lasers for strobe {msg} Cheapskate!')
@@ -223,18 +220,8 @@ def start_muted():
   hmqtt.display_cmd('off')
   hmqtt.tts_mute()
 
-def build_ml_dict(settings):
-  global ml_dict
-  #ml_dict['Cnn_Face'] = Algo('Cnn_Face', settings)
-  ml_dict['Cnn_Shapes'] = Algo('Cnn_Shapes', settings)
-  #ml_dict['Haar_Face'] = Algo('Haar_Face', settings)
-  #ml_dict['Haar_FullBody'] = Algo('Haar_FullBody', settings)
-  #ml_dict['Haar_UpperBody'] = Algo('Haar_UpperBody', settings)
-  #ml_dict['Hog_People'] = Algo('Hog_People', settings)
-  return ml_dict
-
 def main():
-  global settings, hmqtt, applog, face_proxy, audiodev, trumpy_state
+  global settings, hmqtt, applog, audiodev, trumpy_state
   global state_machine, video_dev, ml_dict
   # process cmdline arguments
   loglevels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
@@ -289,14 +276,6 @@ def main():
     applog.info(f'Using local camera: {settings.local_cam}')
     video_dev = cv2.VideoCapture(settings.local_cam)
     video_dev.release()
-  '''  
-  # connect to the face recogition server
-  face_proxy = rpyc.connect(settings.face_server_ip, settings.face_port, 
-          #config={'allow_all_attrs': True})
-          config={'allow_all_attrs': True, 'allow_public_attrs': True})
-  '''
-  # setup ml_dict for shape detector(s)
-  ml_dict = build_ml_dict(settings)
   
   # Turn off display, mute mycroft
   th = threading.Timer(2 * 60, start_muted)
@@ -651,7 +630,7 @@ def register_machine(evt, arg=None):
       # finish registration - have face and picture.
       # send them to fc server
       trumpy_bear.face_path = "/var/www/camera/face.jpg"
-      save_recog(trumpy_bear)
+      # save_recog(trumpy_bear) This should not be needed. TODO: delete.
       trumpy_bear.save_user()
       do_recog(trumpy_bear)
       if trumpy_bear.name == name1:
@@ -792,7 +771,7 @@ def begin_intruder():
   applog.info('begin intruder')
   hmqtt.start_music_alarm()      # sets mqtt switch to wake up a HE rule
   hmqtt.display_text("Lasers are Tracking")
-  begin_tracking(2, False, False);
+  begin_tracking(0.5, False, False);
   print('exiting intruder')
   long_timer(2)
 
@@ -800,7 +779,7 @@ def begin_intruder():
 # return name string or None for the picture (path) in 
 # TrumpyBear object.
 def do_recog(tb):
-  global face_proxy, applog, settings
+  global applog, settings
   applog.debug(f'get_face_name {tb.face_path}')
   bfr = open(tb.face_path, 'rb').read()
   # Use websocket-client, find one that is up and running.
@@ -827,50 +806,7 @@ def do_recog(tb):
   if len(names) == 0:
     names = [None]
   return names[0]
-  '''
-  try:
-    ws = websocket.WebSocket()
-    try:
-      uri = f'ws://{settings.face_server_ip}:{settings.face_port}'
-      ws.connect(uri)
-    except ConnectionRefusedError:
-      applog.warning(f'Fail {settings.face_server_ip} Switching to backup')
-      try:
-        uri = f'ws://{settings.backup_ip}:{settings.face_port}'
-        ws.connect(uri)
-      except ConnectionRefusedError:
-        applog.warning(f'Backup {settings.backup_ip} FAIL to connect')
-        return []
-        
-    ws.send(base64.b64encode(bfr))
-    reply = ws.recv()
-    ws.close()
-
-    js = json.loads(reply)
-    details = js['details']
-    mats = details['matrices']
-    names = []
-    for i in range(len(mats)):
-      names.append(mats[i]['tag'])
-    if len(names) == 0:
-      names = [None]
-    return names[0]
-  except:
-    applog('Major Fail on websocket')
-'''    
-'''
-  # call remote port 4774
-  result = face_proxy.root.face_recog(bfr)
-  return result
-'''
-
-def save_recog(tb):
-  global face_proxy
-  print(f'save_face: {tb.name}, {tb.face_path}')
-  bfr = open(tb.face_path, 'rb').read()
-  result = face_proxy.root.save_recog(tb.name, bfr)
-  return result
-    
+  
 def request_picture(typ):
   global settings, hmqtt, applog, video_dev
   # get a picture from the camera
@@ -969,8 +905,8 @@ def trumpy_recieve(jsonstr):
   rargs = json.loads(jsonstr)
   cmd = rargs['cmd']
   if cmd == 'init':
-    # hubitat can send an init, can override camera motion sensor choice in json
     '''
+    # hubitat can send an init, which can override camera motion sensor choice in json
     topic = rargs['reply']
     settings.camera_topic = 'homie/'+topic+'/motionsensor/control/set'
     settings.status_topic = 'homie/'+settings.homie_device+'/control/cmd'
@@ -1003,7 +939,7 @@ def trumpy_recieve(jsonstr):
       dbg = rargs.get('debug',False)
       test = rargs.get('test',False)
       applog.info('calling begin_tracking')
-      begin_tracking(2, dbg, test)
+      begin_tracking(0.1, dbg, test)
     except:
       traceback.print_exc()
   elif cmd == 'calib':
@@ -1024,7 +960,8 @@ def image_serialize(frame):
   _, jpg = cv2.imencode('.jpg',image)
   bfr = jpg.tostring()
   return bfr
-  
+
+'''
 def motion_track_rpc(display):
   global tracking_stop_flag, video_dev, ml_dict, applog
   global settings
@@ -1066,7 +1003,8 @@ def motion_track_rpc(display):
     
   applog.info(f'ending rpc loop {cnt} frames {cnt/120} fps for {hits}')
   video_dev.release()
-  
+'''
+
 '''
 Zmq Trickiness: We can't detect that the zmq 'hub' is not answering
 until we try to send to it AND it times out. Then we can try a different
@@ -1082,9 +1020,11 @@ the second one will be sent the images. This COULD leave a clean up problem.
 '''
 zmqsender = None
 zmqSenderIdx = 0
+zmqDebug = False
+zmqPanel = True
 
 def motion_track_zmq(display, panel):
-  global tracking_stop_flag, video_dev, zmqsender, applog
+  global tracking_stop_flag, video_dev, zmqsender, zmqSenderIdx, applog
   global settings
   applog.info('motion_track_zmq called')
   time.sleep(1)
@@ -1101,7 +1041,7 @@ def motion_track_zmq(display, panel):
     try:
       zmqsender.send_jpg('trumpy4', jpg_buffer)
     except (zmq.ZMQError, zmq.ContextTerminated):
-      # Todo: try the next zmq hub. Will drop the frame.
+      # Try the first available zmq hub. Will drop the frame on retry.
       set_zmqSender()
       applog.info(f'failed sending frame# {cnt} trying next server')
       traceback.print_exc()
@@ -1109,12 +1049,14 @@ def motion_track_zmq(display, panel):
     #applog.info(f'sent {cnt}')
   
   applog.info(f'closing image socket, {cnt} , {cnt/120} fps')
-  zmqsender.close()
+  #zmqsender.close() # There is no close(). 
+  zmqsender = None
+  zmqSenderIdx = 0
   video_dev.release()
   
-def tracking_timer(min=5,testing=False):
+def tracking_timer(minutes=0.5,testing=False):
   print('creating tracking timer')
-  tracking_thread = threading.Timer(min * 60, tracking_finished, args=(testing,))
+  tracking_thread = threading.Timer(minutes * 60, tracking_finished, args=(testing,))
   tracking_thread.start()
 
 '''
@@ -1136,11 +1078,13 @@ def pick_imagezmq(ips, port):
       continue
 '''
 def set_zmqSender():
-  global settings, zmqsender, zmqSenderIdx
+  global settings, zmqsender, zmqSenderIdx, zmqDebug, zmqPanel
   if zmqSenderIdx < len(settings.zmq_tracker_ip):
     uri = f'tcp://{settings.zmq_tracker_ip[zmqSenderIdx]}:{settings.zmq_port}'
+    hmqtt.tracker(json.dumps({'begin':settings.zmq_tracker_ip[zmqSenderIdx],
+        'debug': zmgDebug, 'panel': zmqPanel}))
     applog.info(f'trying tracker at {uri}')
-    zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=100, recv_timeout=100)
+    zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=0.100, recv_timeout=0.100)
     zmqSenderIdx += 1
     return 
   else:
@@ -1150,34 +1094,29 @@ def set_zmqSender():
 
 # it gets complicated. we need some time for the server to get
 # cranking
-def begin_tracking(min=0.5, debug=False, test=False):
+def begin_tracking(delay=0.1, debug=False, test=False):
   global hmqtt, applog, settings, tracking_stop_flag, video_dev
+  global zmqsender, zmqSenderIdx, zmqDebug, zmqPanel
   # open the camera 
   video_dev = cv2.VideoCapture(settings.local_cam)
   video_dev.set(3, 640)
   video_dev.set(4, 480)
   # TODO: move hmqtt.tracker() call to inside zmqSender() ? 
-  hmqtt.tracker(json.dumps({'begin':True, 'debug': debug, 'panel': test}))
   time.sleep(2) # 2 sec for camera to settle and for server to set up
   try:
     if settings.use_ml == 'remote_zmq': 
-      global zmqsender, zmqSenderIdx
-      '''
-      uri = f'tcp://{settings.ml_server_ip}:{settings.ml_port}'
-      #zmqsender = imagezmq.ImageSender(connect_to='tcp://192.168.1.2:4783')
-      zmqsender = imagezmq.ImageSender(connect_to=uri)
-      '''
-      zmqSenderIdx = 0;
-      set_zmqSender();
-      #zmqsender = pick_imagezmq(settings.zmq_tracker_ip, settings.zmq_port)
+      zmqSenderIdx = 0
+      zmqDebug = debug
+      zmqPanel = test
+      set_zmqSender()
       
     applog.info("trumpy begin tracking thread")
     tracking_stop_flag = False
-    tracking_timer(min, testing=test)
-    if settings.use_ml == 'remote_rpc':
-      trk_thread = Thread(target=motion_track_rpc, args=(debug,test))
-    elif settings.use_ml == 'remote_zmq':
+    tracking_timer(delay, testing=test)
+    if settings.use_ml == 'remote_zmq':
       trk_thread = Thread(target=motion_track_zmq, args=(debug,test))
+    #elif settings.use_ml == 'remote_rpc':
+    #  trk_thread = Thread(target=motion_track_rpc, args=(debug,test))
     trk_thread.start()
   except:
     traceback.print_exc()

@@ -3,7 +3,7 @@
 # run by autostart when user 'pi' logs in via GUI - may not have a monitor
 # but we might. We need pulseaudio and dbus, they need the gui running. 
 #
-cd $HOME/Projects/iot/alarm
+cd $HOME/trumpybear
 # configure pulseaudio streams. 
 # 1. Stop alsa from interfering 
 # 2. (re)connect to the bluetooth speaker
@@ -17,4 +17,4 @@ echo -e "connect DE:B0:D2:C5:0B:7C" | bluetoothctl
 # for stand alone. 
 pactl set-source-volume 1 120% 
 # Start the tts program.
-/usr/bin/python3 alarm.py -d2 -c trumpy.json
+/usr/bin/python3 trumpy.py -s -c trumpy.json
