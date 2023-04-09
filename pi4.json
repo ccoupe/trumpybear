@@ -1,0 +1,38 @@
+{
+  "mqtt_server_ip": "stoic.local",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "test_bear1",
+  "homie_device": "test_trumpy_bear",
+  "homie_name": "Test Bear Pi3",
+  "camera_number": null,
+  "camera_topic": "pi4_webcam",
+  "mycroft_ip": "pi4.local",
+  "ranger_mode": "once",
+  "face_server_ip": ["bronco.local","mini.local"],
+  "face_port": 4785,
+  "ml_algo": "Cnn_Shapes",
+  "confidence": 0.4,
+  "zmq_tracker_ip": ["bronco.local","mini.local"],
+  "zmq_port": 4783,
+  "use_ml": "remote_zmq",
+  "turrets": [
+    {
+	"name": "Front Center",
+	"topic": "homie/turret_front/turret_1/control",
+    "front": true,
+	"pan_min": 51,
+	"pan_max": 150,
+	"tilt_min": 70,
+    "tilt_max": 120
+    },
+    {
+	"name": "Left Back",
+	"topic": "homie/turret_back/turret_1/control",
+    "front": false,
+	"pan_min": 60,
+	"pan_max": 180,
+	"tilt_min": 80,
+	"tilt_max": 120
+    }
+  ]
+}
