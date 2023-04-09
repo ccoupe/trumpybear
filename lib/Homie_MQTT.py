@@ -22,7 +22,8 @@ class Homie_MQTT:
     self.state_machine = sm
     
     # init server connection
-    self.client = mqtt.Client(settings.mqtt_client_name, False)
+    #self.client = mqtt.Client(settings.mqtt_client_name, False)
+    self.client = mqtt.Client(settings.mqtt_client_name, True)
     #self.client.max_queued_messages_set(3)
     hdevice = self.hdevice = self.settings.homie_device  # "device_name"
     hlname = self.hlname = self.settings.homie_name     # "Display Name"
@@ -110,15 +111,16 @@ class Homie_MQTT:
     # control node
     self.publish_structure("homie/"+hdevice+"/control/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/control/$type", "controller")
-    #self.publish_structure("homie/"+hdevice+"/control/$properties","cmd")
-    self.client.publish("homie/"+hdevice+"/control/$properties","cmd", qos=1, retain=False)
+    self.publish_structure("homie/"+hdevice+"/control/$properties","cmd")
+    #self.client.publish("homie/"+hdevice+"/control/$properties","cmd", qos=1, retain=False)
     
     #  cmd Property of 'control'
     self.publish_structure("homie/"+hdevice+"/control/cmd/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/control/cmd/$datatype", "string")
     self.publish_structure("homie/"+hdevice+"/control/cmd/$settable", "true")
     self.publish_structure("homie/"+hdevice+"/control/cmd/$retained", "true")
-
+    # self.client.publish("homie/"+hdevice+"/control/cmd/set","", qos=1, retain=False)
+    
     # speech node
     self.publish_structure("homie/"+hdevice+"/speech/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/speech/$type", "speech")
@@ -269,9 +271,17 @@ class Homie_MQTT:
   # These use the bridge to talk to mycroft
   def speak(self, str):
     self.client.publish(self.hsay_pub, str)
-
-  def ask(self, str):
-    self.client.publish(self.hask_pub, str)
+    
+  # not used in trumpybear v2:
+  #def ask(self, str):
+  #  self.client.publish(self.hask_pub, str)
+    
+  def ask_name(self):
+    self.client(self.hask_pub, "nameis')
+    pass
+    
+  def ask_music_or_talk(self):
+    self.client(self.hask_pub, "music_talk')
 
   def tts_unmute(self):
     self.client.publish(self.hctl_pub, 'on')
