@@ -1,0 +1,10 @@
+[Unit]
+Description=Trumpy Bear
+After=mycroft.service
+Wants=mycroft.service
+[Service]
+ExecStart=/usr/local/bin/trumpybear.sh
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

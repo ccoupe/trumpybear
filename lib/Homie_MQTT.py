@@ -246,7 +246,7 @@ class Homie_MQTT:
     return self.mqtt_connected
 
   def on_connect(self, client, userdata, flags, rc):
-    self.log.debug("Subscribing: %s %d" (type(rc), rc))
+    self.log.debug(f"Subscribing: {type(rc)} {rc}")
     if rc == 0:
       self.log.debug("Connecting to %s" % self.mqtt_server_ip)
       rc,_ = self.client.subscribe(self.hurl_sub)
@@ -277,17 +277,19 @@ class Homie_MQTT:
   #  self.client.publish(self.hask_pub, str)
     
   def ask_name(self):
-    self.client(self.hask_pub, "nameis')
-    pass
+    self.client(self.hask_pub, "nameis")
     
   def ask_music_or_talk(self):
-    self.client(self.hask_pub, "music_talk')
+    self.client(self.hask_pub, "music_talk")
 
   def tts_unmute(self):
     self.client.publish(self.hctl_pub, 'on')
     
   def tts_mute(self):
     self.client.publish(self.hctl_pub, 'off')
+    
+  def begin_chat(self):
+    self.client.publish(self.hctl_pub, 'chat')
       
   # These talk to the trumpy_ranger device/node
   def display_cmd(self, st):

@@ -693,13 +693,15 @@ def role_dispatch(trumpy_bear):
   if role == Role.player:
     begin_rasa(trumpy_bear)
   elif role == Role.friend or role == Role.aquaintance or role == Role.relative:
-    begin_mycroft()
+    #begin_mycroft()
+    begin_glados()
   elif role == Role.owner:
     hmqtt.speak("You are very annoying, {}. Are you with the failing New York Times?".format(trumpy_bear.name))
     interaction_finished()
   elif role == Role.unknown:
     if trumpy_bear.ans4 == 'talk':
-      begin_mycroft()
+      #begin_mycroft()
+      begin_glados()
     else:
       begin_intruder()
   else:
@@ -764,6 +766,16 @@ def begin_mycroft():
   hmqtt.speak('You have to say "Hey Mycroft", wait for the beep and then ask your question. \
   Try "hey mycroft", what about the lasers')
   hmqtt.display_text("say 'Hey Mycroft'")
+
+def begin_glados():
+  global hmqtt, applog
+  applog.info('starting GLaDOS')
+  hmqtt.tts_unmute()
+  long_timer(5)
+  # tell the bridge to do the chat stuff.
+  hmqtt.begin_chat()
+  hmqtt.display_text("You may regret that choice")
+
 
 def tame_mycroft():
   global hmqtt, applog
@@ -952,7 +964,10 @@ def trumpy_recieve(jsonstr):
     s = rargs.get('minutes', 2)
     extend_logout(s)
   elif cmd == 'mycroft':
-      begin_mycroft()
+      #begin_mycroft()
+      begin_glados()
+  elif cmd == 'glados':
+      begin_glados()
   elif cmd == 'track':
     try:
       dbg = rargs.get('debug',False)
