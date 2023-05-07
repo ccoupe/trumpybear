@@ -46,6 +46,10 @@ from imutils.video import VideoStream
 # Face Recognition uses
 import websocket  # websocket-client
 import base64
+from PIL import Image
+import io
+
+
 
 # Tracking uses:
 from lib.ImageZMQ import imagezmq
@@ -976,6 +980,8 @@ def trumpy_recieve(jsonstr):
       begin_tracking(0.1, dbg, test)
     except:
       traceback.print_exc()
+  elif cmd == 'ranger_test':
+    begin_ranger_calibrate(rargs['distance'],rargs['delay'])
   elif cmd == 'calib':
     begin_calibrate(rargs['distance'],rargs['time'])
   elif cmd == 'closing':
@@ -1202,7 +1208,70 @@ def begin_calibrate(meters, secs):
   video_dev.release()
   # turn off ranger.
   # reset statemachine
-
   new_sm(old_machine)
+
+def image_to_byte_array(image: Image) -> bytes:
+  # BytesIO is a file-like buffer stored in memory
+  imgByteArr = io.BytesIO()
+  # image.save expects a file-like as a argument
+  image.save(imgByteArr, format=image.format)
+  # Turn the BytesIO object back into a bytes object
+  imgByteArr = imgByteArr.getvalue()
+  return imgByteArr
+
+def ranger_calib_machine(evt, arg=None):
+  global hmqtt, sm_lock, trumpy_state, calib_distance
+  applog.debug("rcm entry {} {}".format(trumpy_state, evt))
+  cur_state = trumpy_state
+  # lock machine
+  sm_lock.acquire()
+  next_state = None
+  if evt == Event.start:
+    if trumpy_state == State.initialized:
+      # get an image
+      next_state = State.waitface
+      request_picture('person')
+  elif evt == Event.pict:
+    if trumpy_state == State.waitface:
+      next_state = State.waitrange
+      # encode it and send to zmq to get the person rectangle
+      image = Image.open("/var/www/camera/person.jpg")
+      ba = image_to_byte_array(image)
+      # then base64 because it's just easier to deal with on the server
+      bfr = base64.b64encode(ba)
+      hmqtt.ranger_send(bfr)
+  elif evt == Event.Ranger:
+    if trumpy_state == State.waitrange:
+      # do something with arg
+      dt = json.loads(arg)
+      dt['calib_distance'] = calib_distance
+      msg = json.dumps(dt)
+      applog.info(f"ranger calibrate: {msg}")
+      next_state = State.initialized
+      # send text message to Login's msg_hdr Tk widget (hdspt)
+      hmqtt.display_text(msg)
+  elif evt == Event.abort:
+    next_state = State.aborting
+  else:
+    applog.info('unknown state for range calib mode')
+  trumpy_state = next_state
+  applog.debug("rcm exit {} {} => {}".format(cur_state, evt, trumpy_state))
+  
+  # unlock machine - now we can call long running things
+  sm_lock.release()
+  
+def begin_ranger_calibrate(distance, delay): 
+  global calib_distance, state_machine
+  # set up new state machine and save current
+  old_machine = state_machine 
+  new_sm(ranger_calib_machine)
+  # set up yet another timer in case we get stuck in the new machine
+  # start the machine 
+  time.sleep(delay)
+  calib_distance = distance
+  state_machine(Event.start, None)
+  # back to previous statemachine ? How
+  #new_sm(old_machine)
+  
 if __name__ == '__main__':
   sys.exit(main())

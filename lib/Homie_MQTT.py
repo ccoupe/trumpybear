@@ -47,15 +47,16 @@ class Homie_MQTT:
     self.hsay_pub = "homie/"+hdevice+"/speech/say/set"
     self.hask_pub = "homie/"+hdevice+"/speech/ask/set"
     self.hctl_pub = "homie/"+hdevice+"/speech/ctl/set"
-    # TODO: HARD CODED is evil and it's not Homie compat:
-    self.hEnbl_pub = "homie/trumpy_enable/switch/state"
-    self.hCops_pub = 'homie/trumpy_cops/switch/state'
+    # V2 - fixed these:
+    self.hEnbl_pub = settings.hEnbl_pub #"homie/trumpy_enable/switch/state"
+    self.hCops_pub = settings.hCops_pub #'homie/trumpy_cops/switch/state'
     # newer device nodes to listen on
     self.hchime_sub = "homie/"+hdevice+"/chime/state/set"
     self.hsiren_sub = "homie/"+hdevice+"/siren/state/set"
     self.hstrobe_sub = "homie/"+hdevice+"/strobe/state/set"
-    # esp32 with display and autoranger
-    self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
+    # V2 - fixed these: esp32 with display and autoranger - 'homie/trumpy_ranger/autoranger/distance'
+    self.hrgrsub = settings.ranger_distance 
+    self.hrgrpub = settings.ranger_cmd
     sublist = [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hchime_sub,
         self.hsiren_sub, self.hstrobe_sub, self.hrgrsub]
     # camera motion detector
@@ -68,7 +69,7 @@ class Homie_MQTT:
     else:
       self.hmotsub = ''
     
-    # Shoes app listens for login/registation info at:
+    # Login app listens for login/registation info at:
     self.hscn_pub = f'homie/{hdevice}/screen/control/set'
     
     self.log.debug("Homie_MQTT __init__")
@@ -79,11 +80,11 @@ class Homie_MQTT:
         self.log.warn(f"Subscribe to {sub} failed: {rc}")
       else:
         self.log.debug(f"Init() Subscribed to {sub}") 
-
-    self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
-    self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
-    self.hdspcmd = 'homie/trumpy_ranger/display/mode/set'
-    self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
+    # V2 - fixed these? :
+    self.hrgrdist = settings.hrgrdist #'homie/trumpy_ranger/autoranger/distance/set'
+    self.hrgrmode = settings.hrgrmode #'homie/trumpy_ranger/autoranger/mode/set'
+    self.hdspcmd = settings.hdspcmd   #'homie/trumpy_ranger/display/mode/set'
+    self.hdsptxt = settings.hdsptxt   #'homie/trumpy_ranger/display/text/set'
     
       
   def create_topics(self, hdevice, hlname):
@@ -292,6 +293,11 @@ class Homie_MQTT:
     self.client.publish(self.hctl_pub, 'chat')
       
   # These talk to the trumpy_ranger device/node
+  # V2
+  def ranger_send(self, bfr)
+    self.client.publish(self.hrgrpub, bfr)
+    
+  # V1
   def display_cmd(self, st):
     self.client.publish(self.hdspcmd, st)
     
