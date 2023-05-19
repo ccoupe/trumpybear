@@ -17,4 +17,4 @@ echo -e "connect DE:B0:D2:C5:0B:7C" | bluetoothctl
 # for stand alone. 
 pactl set-source-volume 1 120% 
 # Start the tts program.
-/usr/bin/python3 trumpy.py -s -c trumpy.json
+/usr/bin/python3 trumpy.py -s -c pi4.json

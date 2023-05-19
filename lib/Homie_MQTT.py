@@ -22,7 +22,8 @@ class Homie_MQTT:
     self.state_machine = sm
     
     # init server connection
-    self.client = mqtt.Client(settings.mqtt_client_name, False)
+    #self.client = mqtt.Client(settings.mqtt_client_name, False)
+    self.client = mqtt.Client(settings.mqtt_client_name, True)
     #self.client.max_queued_messages_set(3)
     hdevice = self.hdevice = self.settings.homie_device  # "device_name"
     hlname = self.hlname = self.settings.homie_name     # "Display Name"
@@ -46,17 +47,19 @@ class Homie_MQTT:
     self.hsay_pub = "homie/"+hdevice+"/speech/say/set"
     self.hask_pub = "homie/"+hdevice+"/speech/ask/set"
     self.hctl_pub = "homie/"+hdevice+"/speech/ctl/set"
-    # TODO: HARD CODED is evil and it's not Homie compat:
-    self.hEnbl_pub = "homie/trumpy_enable/switch/state"
-    self.hCops_pub = 'homie/trumpy_cops/switch/state'
+    # V2 - fixed these:
+    self.hEnbl_pub = settings.hEnbl_pub #"homie/trumpy_enable/switch/state"
+    self.hCops_pub = settings.hCops_pub #'homie/trumpy_cops/switch/state'
     # newer device nodes to listen on
-    self.hchime_sub = "homie/"+hdevice+"/chime/state/set"
-    self.hsiren_sub = "homie/"+hdevice+"/siren/state/set"
-    self.hstrobe_sub = "homie/"+hdevice+"/strobe/state/set"
-    # esp32 with display and autoranger
-    self.hrgrsub = 'homie/trumpy_ranger/autoranger/distance'
-    sublist = [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hchime_sub,
-        self.hsiren_sub, self.hstrobe_sub, self.hrgrsub]
+    # V2 doesn't have chime,siren,strobe - mqttaudio does
+    #self.hchime_sub = "homie/"+hdevice+"/chime/state/set"
+    #self.hsiren_sub = "homie/"+hdevice+"/siren/state/set"
+    #self.hstrobe_sub = "homie/"+hdevice+"/strobe/state/set"
+    # V2 - fixed these: esp32 with display and autoranger - 'homie/trumpy_ranger/autoranger/distance'
+    self.hrgrsub = settings.ranger_distance 
+    self.hrgrpub = settings.ranger_cmd
+    sublist = [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hrgrsub ]
+      #self.hchime_sub, self.hsiren_sub, self.hstrobe_sub ]
     # camera motion detector
     if settings.local_cam is None:
       flds = settings.camera_topic.split('/')
@@ -67,7 +70,7 @@ class Homie_MQTT:
     else:
       self.hmotsub = ''
     
-    # Shoes app listens for login/registation info at:
+    # Login/Console app listens for login/registation info at:
     self.hscn_pub = f'homie/{hdevice}/screen/control/set'
     
     self.log.debug("Homie_MQTT __init__")
@@ -78,11 +81,11 @@ class Homie_MQTT:
         self.log.warn(f"Subscribe to {sub} failed: {rc}")
       else:
         self.log.debug(f"Init() Subscribed to {sub}") 
-
-    self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
-    self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
-    self.hdspcmd = 'homie/trumpy_ranger/display/mode/set'
-    self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
+    # TODO V2 - fixed these? :
+    self.hrgrdist = settings.hrgrdist #'homie/trumpy_ranger/autoranger/distance/set'
+    self.hrgrmode = settings.hrgrmode #'homie/trumpy_ranger/autoranger/mode/set'
+    self.hdspcmd = settings.hdspcmd   #'homie/trumpy_ranger/display/mode/set'
+    self.hdsptxt = settings.hdsptxt   #'homie/trumpy_ranger/display/text/set'
     
       
   def create_topics(self, hdevice, hlname):
@@ -110,15 +113,16 @@ class Homie_MQTT:
     # control node
     self.publish_structure("homie/"+hdevice+"/control/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/control/$type", "controller")
-    #self.publish_structure("homie/"+hdevice+"/control/$properties","cmd")
-    self.client.publish("homie/"+hdevice+"/control/$properties","cmd", qos=1, retain=False)
+    self.publish_structure("homie/"+hdevice+"/control/$properties","cmd")
+    #self.client.publish("homie/"+hdevice+"/control/$properties","cmd", qos=1, retain=False)
     
     #  cmd Property of 'control'
     self.publish_structure("homie/"+hdevice+"/control/cmd/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/control/cmd/$datatype", "string")
     self.publish_structure("homie/"+hdevice+"/control/cmd/$settable", "true")
     self.publish_structure("homie/"+hdevice+"/control/cmd/$retained", "true")
-
+    # self.client.publish("homie/"+hdevice+"/control/cmd/set","", qos=1, retain=False)
+    
     # speech node
     self.publish_structure("homie/"+hdevice+"/speech/$name", hlname)
     self.publish_structure("homie/"+hdevice+"/speech/$type", "speech")
@@ -204,7 +208,8 @@ class Homie_MQTT:
       if (topic == self.hurl_sub):
         #ply_thr = Thread(target=self.playCb, args=(payload,))
         #ply_thr.start()
-        self.playCb(payload)
+        #self.playCb(payload)
+        pass
       elif topic == self.hcmd_sub:
         # payload should be json. Fires up Trumpy Bear state_machice
         tb_thr = Thread(target=self.controller, args=(payload,))
@@ -218,18 +223,6 @@ class Homie_MQTT:
         rg_thr = Thread(target=self.state_machine, args=(Event.ranger, payload))
         rg_thr.start()
         #self.state_machine(Event.ranger, payload)
-      elif topic == self.hchime_sub:
-        chime_thr = Thread(target=self.chimeCb, args=(payload,))
-        chime_thr.start()
-        #self.chimeCb(payload)
-      elif topic == self.hsiren_sub:
-        siren_thr = Thread(target=self.sirenCb, args=(payload,))
-        siren_thr.start()
-        #self.sirenCb(payload)
-      elif topic == self.hstrobe_sub:
-        strobe_thr = Thread(target=self.strobeCb, args=(payload,))
-        strobe_thr.start()
-        #self.strobeCb(payload)
       elif topic == self.hmotsub:
         motion_thr = Thread(target=self.state_machine, args=(Event.motion, payload))
         motion_thr.start()
@@ -244,7 +237,7 @@ class Homie_MQTT:
     return self.mqtt_connected
 
   def on_connect(self, client, userdata, flags, rc):
-    self.log.debug("Subscribing: %s %d" (type(rc), rc))
+    self.log.debug(f"Subscribing: {type(rc)} {rc}")
     if rc == 0:
       self.log.debug("Connecting to %s" % self.mqtt_server_ip)
       rc,_ = self.client.subscribe(self.hurl_sub)
@@ -269,17 +262,34 @@ class Homie_MQTT:
   # These use the bridge to talk to mycroft
   def speak(self, str):
     self.client.publish(self.hsay_pub, str)
-
-  def ask(self, str):
-    self.client.publish(self.hask_pub, str)
+    
+  # not used in trumpybear v2:
+  #def ask(self, str):
+  #  self.client.publish(self.hask_pub, str)
+    
+  def ask_name(self):
+    self.client.publish(self.hask_pub, "nameis")
+    
+  def ask_music_or_talk(self):
+    self.client.publish(self.hask_pub, "music_talk")
 
   def tts_unmute(self):
-    self.client.publish(self.hctl_pub, 'on')
+    #self.client.publish(self.hctl_pub, 'on')
+    pass
     
   def tts_mute(self):
-    self.client.publish(self.hctl_pub, 'off')
+    #self.client.publish(self.hctl_pub, 'off')
+    pass
+    
+  def begin_chat(self):
+    self.client.publish(self.hctl_pub, 'chat')
       
   # These talk to the trumpy_ranger device/node
+  # V2
+  def ranger_send(self, bfr):
+    self.client.publish(self.hrgrpub, bfr)
+    
+  # V1
   def display_cmd(self, st):
     self.client.publish(self.hdspcmd, st)
     

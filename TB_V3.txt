@@ -1,0 +1,104 @@
+TB next Gen
+Overview from HE perspective
+  TB Mean mode started by HE (when mode = armed-night or armed-away)
+    and HSM signals intrusion or by Testing Switch - 
+      If not recogized: Does 'who is' conversation, pick the talk/music path
+----> if recognized stop/cancel, 
+    Music path: trumpy.py:begin_intruder() (steps 1,2,3)
+      1. homie/trumpy_enable/switch/state turned on 
+        That is HE: Trumpy Enable Switch - which Fires 'Trumpy Music' rule (RM)
+      2. "Trumpy Music" plays the music, 
+          Sets Cops Arrive Switch, 
+    Talk path: trumpy.py:begin_mycroft() (1 and 3)
+      1. sets 2m timer. when it expires:
+          Turns on Cops Arrive Switch - /homie/trumpy_cops/switch/state
+---->      NEED TO do this.
+      3. Cops Arrive Switch + Rule
+          turns alarm lights on
+          plays arrive chime - mac mini issue
+          
+Where to use Lasers?
+          
+
+At startup, go into 'tame' mode.
+HE/HSM can can turn it into 'mean' mode via 'You're Fired' switch
+
+Login and Register - Touch Panel App (Shoes) 
+done: login - using face - can turn off alarms, play with lasers
+     request HE to turn on light.
+     request TB to do login face recog.
+done:  HE [Alexa] can start a 'registration' (TB Register Switch)
+      a. sends homie/trumpy_bear/screen/control/set  {"cmd": "register"}
+      b. Shoes app cmd/register,  
+        request HE to turn on light
+        replaces Login panel with registration panel
+        asks homie/trumpy_bear/control/cmd {"cmd": "register"} 
+      c. TB sends {cmd: user, user: xxx, role: x}
+      d. shoes confirms and if yes
+        replace panel with login panel
+done: 'Trumpy Register Switch' and mqtt-driver - puts Shoes.app in registration mode
+      which puts TB in register mode.
+      which sets Trumpy Active Switch
+      
+done: Your Fired' switch - starts trumpy bear in mean mode. 
+      Should Motion event trigger it?  For Demo/Test purposes. 
+        
+done: 'Trumpy Active' switch - controls Yamaha, Trumpy Lamp via Trumpy Busy Rule.
+      turns on switch when recieves 'awake' on homie/trumpy_bear/screen/control
+      from Shoes. Turns off with 'sleep' sleep message
+      
+done: 'Trumpy Busy" RULE - lights on/off, mute/unmute when 'Trumpy Active' is set
+    
+Turning OFF TB  when it's in Mean Mode:
+  HSM started Trumpy Bear - we need to stop the bear stuff and
+  get HSM disarmed 
+  HSM enable/disable is button oriented. 
+  
+1. Via HE:
+
+2. From front panel, login->alarm->off
+
+---------------- Front Panel ------------------
+
+Login flow: login_machine
+                                                setup TB partial
+login.rb -> {'cmd':'login'...} -> trumpy.py --> get pict, do_recog pict->name
+                                                  finish TB object(name, pict) - 
+                                                  save max of 4 picts <== new
+option   <- {'cmd': 'user', ..} <---- success -------------+
+panel                                                      |
+         <- {'display', message} <------hello/I dont-------+
+         
+Register flow: register_machine
+                                                setup TB partial. ranger positioning
+   {'cmd': 'register'} ----------> trumpy.py --> ask name, get_pict. 
+                                                    save pict,name @ recog server
+                                                    do_recog <========== new
+                                                    if recog 
+                                                      recog_
+                                                      delete TB object <==== new
+                                                           +
+        <- {'display', message} <------registered /fail----+
+        
+Mean Mode: 
+  {'cmd': 'begin'} --------------> trumpy.py ---> 
+        
+New user should register. Then login.
+
+~/.trumpybear/name.json - known users.
+             /{name}/ 4 pictures max
+             
+~/known_faces/{name}/ pictures
+ 
+  
+Mycroft Skills - more bridge work? 
+  "register" skill
+     intent: "take a picture"
+     dialog: "what name to use"
+     tell bridge/MQTT/TB
+  "measure distance skill"
+  "stop" skill
+    "turn off", "stop working", "I'm done", "go to sleep"
+  "lasers" skill
+    "turn on", "stop"
+  

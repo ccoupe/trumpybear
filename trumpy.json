@@ -8,7 +8,7 @@
   "camera_topic": "trumpy_cam",
   "mycroft_ip": "192.168.1.10",
   "ranger_mode": "once",
-  "face_server_ip": ["bronco.local","nano.local","mini.local"],
+  "face_server_ip": ["bronco.local","mini.local"],
   "face_port": 4785,
   "ml_algo": "Cnn_Shapes",
   "confidence": 0.4,

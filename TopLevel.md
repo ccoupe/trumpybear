@@ -92,7 +92,7 @@ returns audio to play on the speaker (TTS). Skills can do much more than tell th
 Trumpy Bear uses Mycroft's STT, TTS and skill capabilities to converse in a 'guided'
 conversion. 
 
-Mycroft does not run well on a Pi3, IMO. A Pi 4 provides a lot more headroom.
+Mycroft does not run well on a Pi3 IMO. A Pi 4 provides a lot more headroom.
 
 ### Vision
 There is a camera attatched to the Pi4. In my case it's one that will switch to
@@ -247,7 +247,7 @@ mycroft-bridge.
 #### trumpy.json
 ```json
 {
-  "mqtt_server_ip": "192.168.1.7",
+  "mqtt_server_ip": "stoic.local",
   "mqtt_port": 1883,
   "mqtt_client_name": "trumpy_bear1",
   "homie_device": "trumpy_bear",
@@ -499,14 +499,14 @@ trumpy4.local
 See startup for TrumpyBear.
 
 ### Kodi
-As well as running the Kodi media server, the node also runs the code
+As well as running the Kodi media server, kodi.local also runs the code
 for HE chime,siren and TTS. And it knows how to display the near realtime
-video of the tracker's camera just the laser turrets use that view.
+video of the tracker's camera as the laser turrets follow the 'perp'
 #### Node
 kodi.local - raspberry Pi 4. 4GB, 64GB sdhc. 
 #### Source
 #### MQTT
-Listens on homie/turret_tracker/track/control/set for a {"uri": ..}
+Listens on  homie/kodi_tracker/track/control/set for a {"uri": ..}
 #### Startup via kodi.service
 ```txt
 [Unit]

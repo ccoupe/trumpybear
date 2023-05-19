@@ -1,0 +1,45 @@
+Daily cron task:
+  Processes - alive 
+  
+Daily task: processes are responding to Application checks&pings:
+    mosquitto server responding
+    bt connected to speaker
+    mycroft bridge
+    mycroft process responding
+    trumpybear process responding
+    login process responding
+    zmqtracker - something simple?
+    turrents - process responding
+ 
+ 
+Python Program - probably using flask for web pages
+Manual Health/Debug/Show-Off:
+  Camera stream via Zmqtracker
+  Mycroft - send mycroft a textual question
+  Turret checks - do a zig zag with laser on
+
+Currently when TB sends the first frame to a zmqtracker it
+  publishes a mqtt message to a kodi topic or a panel topic
+  When kodi or the front panel send an http request for a mjpeg
+  The zmqtracker starts feeding the queue (which is drained by
+  the mjpeg process)
+  
+  Note:  the choice of kodi or front panel is from a previous
+  mqtt sent to the tracker. 
+
+New:
+  Need a multiple thread http server. see the answer near the end with
+  9 upvotes - try that one.
+  https://stackoverflow.com/questions/14088294/multithreaded-web-server-in-python
+  
+  Here is a nicer version - assuming it works.
+  https://github.com/0rtis/multithread-http-server
+  
+  
+  The 'chosen' zmq produces up to N number of streams/queues
+    1. Kodi 
+    2. Login panel
+    3. A demo/test program 
+  Any combination 
+  Should pass
+  

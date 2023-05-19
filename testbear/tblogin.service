@@ -1,0 +1,10 @@
+[Unit]
+Description=Trumpy Bear Login
+[Service]
+Environment=DISPLAY=:0.0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/usr/local/bin/trumpylogin.sh
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target

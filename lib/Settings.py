@@ -64,22 +64,45 @@ class Settings:
     self.face_port = conf.get('face_port', 4785)
     #self.backup_ip = conf.get('backup_ip', '192.168.1.4')
     self.db_path = conf.get('db_path', self.db_path)
-    self.ranger_mode = conf.get('ranger_mode', None)
+    # TODO:   algo only used for calibration ?- zmq ranger could do that?
     self.ml_algo = conf.get('ml_algo', 'Cnn_Shapes')
     self.confidence = conf.get('confidence', 0.4)
     #self.ml_server_ip = conf.get('ml_server_ip', '192.168.1.4')
     self.zmq_tracker_ip = conf.get('zmq_tracker_ip', ['192.168.1.4'])
     self.use_ml = conf.get('use_ml', None)
+    if self.use_ml == 'remote_zmq':
+      self.zmq_port = conf.get("zmq_port", 4783)
+    self.turrets = conf.get('turrets', None)
     '''
     if self.use_ml == 'remote_rpc':
       self.ml_port = conf.get("ml_port", 5266)
     elif self.use_ml == 'remote_zmq':
       self.zmq_port = conf.get("zmq_port", 4783)
+      
+    "ranger": {"type": ?,
+    "cmd_topic": ?,
+    "distance_topic": ?,
+    "upper_limit": ?,
+    "lower_limit": ?,
+    "scale": ?}
     '''
-    if self.use_ml == 'remote_zmq':
-      self.zmq_port = conf.get("zmq_port", 4783)
-    self.turrets = conf.get('turrets', None)
-
+    self.notify_pubs = conf.get('notify_topic', None)
+    dt = conf.get('ranger', None)
+    self.ranger_type = dt.get('type', 'ultrasonic')
+    self.ranger_cmd = dt.get('cmd_topic', 'homie/trumpy_ranger/autoranger/set')
+    self.ranger_distance = dt.get('distance_topic', 'homie/trumpy_ranger/autoranger/distance')
+    self.ranger_upper = dt.get('upper_limit', 250)
+    self.ranger_lower = dt.get('lower_limit', 30)
+    self.ranger_scale = dt.get('scale', 1.0)
+    # TODO: TB V1 compatibility, delete when V2 is running well.
+    self.hrgrdist = 'homie/trumpy_ranger/autoranger/distance/set'
+    self.hrgrmode = 'homie/trumpy_ranger/autoranger/mode/set'
+    self.hdspcmd = 'homie/trumpy_ranger/display/mode/set'
+    self.hdsptxt = 'homie/trumpy_ranger/display/text/set'
+    # V2 moved these out of hqmtt - previously hardcoded. 
+    self.hEnbl_pub = conf.get("enable_alarm", "homie/trumpy_enable/switch/state")
+    self.hCops_pub = conf.get("cops_arrive", 'homie/trumpy_cops/switch/state')
+    
   def print(self):
     self.log.info("==== Settings ====")
     self.log.info(self.settings_serialize())
@@ -98,7 +121,7 @@ class Settings:
     st['face_port'] = self.face_port
     #st['backup_ip'] = self.backup_ip
     st['db_path'] = self.db_path
-    st['ranger_mode'] = self.ranger_mode
+    #st['ranger_mode'] = self.ranger_mode #v2 doesn't use
     st['camera_number'] = self.local_cam
     st['ml_algo'] = self.ml_algo 
     st['confidence']= self.confidence

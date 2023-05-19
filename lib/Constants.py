@@ -23,6 +23,9 @@ class State(enum.Enum):
   four_qs = 8
   aborting = 9
   waitrange = 10
+  ranger_once = 11
+  ranger_loop = 12
+  ranger_leave = 13
 
 
 class Event(enum.Enum):

@@ -1,0 +1,10 @@
+[Unit]
+Description=MQTT Bridge for Mycroft
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/lib/mqttmycroft/mqttmycroft.sh
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
