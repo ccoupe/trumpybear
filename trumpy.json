@@ -7,6 +7,7 @@
   "camera_number": 0,
   "camera_topic": "trumpy_cam",
   "mycroft_ip": "192.168.1.10",
+  "ranger": { },
   "ranger_mode": "once",
   "face_server_ip": ["bronco.local","mini.local"],
   "face_port": 4785,
