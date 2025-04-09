@@ -55,11 +55,15 @@ class Settings:
     self.mqtt_client_name = conf.get("mqtt_client_name", "trumpy_12")
     self.homie_device = conf.get('homie_device', "trumpy_bear")
     self.homie_name = conf.get('homie_name', 'Trumpy Bear Pi3')
-    self.local_cam = conf.get('camera_number', None)
     self.mycroft_ip = conf.get('mycroft_ip', '192.168.1.10')
     self.camera_topic = conf.get('camera_topic', 'trumpy_cam')
-    if self.local_cam != None:
-      self.camera_topic = None
+    self.camera_type = conf.get("camera_type", "local")
+    if self.camera_type == "local":
+      self.frigate_url = None
+      self.camera_number = conf.get("camera_number", 0)
+    elif self.camera_type == "frigate":
+      self.frigate_url = conf.get("frigate_latest_url", None)
+      self.camera_number = None
     self.face_server_ip = conf.get('face_server_ip', ['192.168.1.2'])
     self.face_port = conf.get('face_port', 4785)
     #self.backup_ip = conf.get('backup_ip', '192.168.1.4')
@@ -122,13 +126,17 @@ class Settings:
     #st['backup_ip'] = self.backup_ip
     st['db_path'] = self.db_path
     #st['ranger_mode'] = self.ranger_mode #v2 doesn't use
-    st['camera_number'] = self.local_cam
+    if self.camera_type == 'local':
+      st['camera_number'] = self.camera_number
+    elif self.camera_type == 'frigate':
+      st['frigate_url'] = self.frigate_url
     st['ml_algo'] = self.ml_algo 
     st['confidence']= self.confidence
     st['zmq_tracker_ip'] = self.zmq_tracker_ip 
     st["zmq_port"] = self.zmq_port
     st['use_ml'] = self.use_ml
     st['turrets'] = self.turrets
+    st['frigate_url'] = self.frigate_url
     str = json.dumps(st)
     return str
 

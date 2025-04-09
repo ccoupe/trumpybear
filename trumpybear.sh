@@ -1,5 +1,7 @@
 #!/bin/bash
 #
+# source ~/tb-env/bin/activate
+#
 # run by autostart when user 'pi' logs in via GUI - may not have a monitor
 # but we might. We need pulseaudio and dbus, they need the gui running. 
 #

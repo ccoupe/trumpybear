@@ -1,0 +1,3 @@
+10:41:34 INFO  ranger calibrate tmp: {"ph": 368, "pw": 509, "pa": 187312, "pp": 0.6097395833333333, "cd": 1}	100cm
+10:56:04 INFO  ranger calibrate tmp: {"ph": 317, "pw": 329, "pa": 104293, "pp": 0.3394954427083333, "cd": 1}    200cm
+10:57:50 INFO  ranger calibrate tmp: {"ph": 338, "pw": 222, "pa": 75036,  "pp": 0.2442578125, "cd": 1}			250cm

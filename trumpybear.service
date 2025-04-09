@@ -1,0 +1,10 @@
+[Unit]
+Description=Trumpy Bear
+Wants=mqttaudio.service
+
+[Service]
+ExecStart=/usr/local/lib/trumpybear/trumpybear.sh
+Restart=on-abort
+
+[Install]
+WantedBy=mqttaudio.service

@@ -48,7 +48,8 @@ import websocket  # websocket-client
 import base64
 from PIL import Image
 import io
-
+import requests
+from io import BytesIO 
 
 
 # Tracking uses:
@@ -76,148 +77,7 @@ zmqsender = None
 
 class NuclearOption(Exception):
   pass
-  
-'''
-def mp3_player(fp):
-  global player_obj, applog, audiodev
-  cmd = f'{audiodev.play_mp3_cmd} {fp}'
-  player_obj = Popen('exec ' + cmd, shell=True)
-  player_obj.wait()
 
-# Restore volume if it was changed
-def player_reset():
-  global settings, applog, audiodev
-  if settings.player_vol != settings.player_vol_default and not audiodev.broken:
-    applog.info(f'reset player vol to {settings.player_vol_default}')
-    settings.player_vol = settings.player_vol_default
-    audiodev.set_volume(settings.player_vol_default)
-
-def playUrl(url):
-  global hmqtt, audiodev, applog, settings, player_mp3, player_obj
-  applog.info(f'playUrl: {url}')
-  if url == 'off':
-    if player_mp3 != True:
-      return
-    player_mp3 = False
-    applog.info("killing tts")
-    player_obj.terminate()
-    player_reset()
-    hmqtt.set_status("ready")
-  else:
-    try:
-      urllib.request.urlretrieve(url, settings.tmpf)
-    except:
-      applog.warn(f"Failed download of {url}")
-    hmqtt.set_status("busy")
-    # change the volume?
-    if settings.player_vol != settings.player_vol_default and not audiodev.broken:
-      applog.info(f'set player vol to {settings.player_vol}')
-      audiodev.set_volume(settings.player_vol)
-    player_mp3 = True
-    mp3_player(settings.tmpf)
-    player_reset()
-    hmqtt.set_status("ready")
-    applog.info('tts finished')
-  
-# in order to kill a subprocess running mpg123 (in this case)
-# we need a Popen object. I want the Shell too. 
-playSiren = False
-siren_obj = None
-
-def siren_loop(fn):
-  global playSiren, isDarwin, hmqtt, applog, siren_obj
-  cmd = f'{audiodev.play_mp3_cmd} sirens/{fn}'
-  while True:
-    if playSiren == False:
-      break
-    siren_obj = Popen('exec ' + cmd, shell=True)
-    siren_obj.wait()
-    
-# Restore volume if it was changed
-def siren_reset():
-  global settings, applog, audiodev
-  if settings.siren_vol != settings.siren_vol_default and not audiodev.broken:
-    applog.info(f'reset siren vol to {settings.siren_vol_default}')
-    settings.siren_vol = settings.siren_vol_default
-    audiodev.set_volume(settings.siren_vol_default)
-
-def sirenCb(msg):
-  global applog, hmqtt, playSiren, siren_obj, audiodev
-  if msg == 'off':
-    if playSiren == False:
-      return
-    playSiren = False
-    hmqtt.set_status("ready")
-    applog.info("killing siren")
-    siren_obj.terminate()
-    siren_reset()
-  else:
-    if settings.siren_vol != settings.siren_vol_default and not audiodev.broken:
-      applog.info(f'set siren vol to {settings.siren_vol}')
-      audiodev.set_volume(settings.siren_vol)
-    if msg == 'on':
-      fn = 'Siren.mp3'
-    else:
-      fn = msg
-    applog.info(f'play siren: {fn}')
-    hmqtt.set_status("busy")
-    playSiren = True
-    siren_loop(fn)
-    siren_reset()
-    applog.info('siren finished')
-    hmqtt.set_status("ready")
-
-
-play_chime = False
-chime_obj = None
-
-def chime_mp3(fp):
-  global chime_obj, applog, audiodev
-  cmd = f'{audiodev.play_mp3_cmd} {fp}'
-  chime_obj = Popen('exec ' + cmd, shell=True)
-  chime_obj.wait()
-
-# Restore volume if it was changed
-def chime_reset():
-  global settings, applog, audiodev
-  if settings.chime_vol != settings.chime_vol_default and not audiodev.broken:
-    applog.info(f'reset chime vol to {settings.chime_vol_default}')
-    settings.chime_vol = settings.chime_vol_default
-    audiodev.set_volume(settings.chime_vol_default)
-
-def chimeCb(msg):
-  global applog, chime_obj, play_chime, settings, audiodev
-  if msg == 'off':
-    if play_chime != True:
-      return
-    play_chime = False
-    applog.info("killing chime")
-    chime_obj.terminate()
-    chime_reset()
-    hmqtt.set_status("ready")
-  else:
-    # if volume != volume_default, set new volume, temporary
-    if settings.chime_vol != settings.chime_vol_default and not audiodev.broken:
-      applog.info(f'set chime vol to {settings.chime_vol}')
-      audiodev.set_volume(settings.chime_vol)
-    flds = msg.split('-')
-    num = int(flds[0].strip())
-    nm = flds[1].strip()
-    fn = 'chimes/' + nm + '.mp3'
-    applog.info(f'play chime: {fn}')
-    hmqtt.set_status("busy")
-    play_chime = True
-    chime_mp3(fn)
-    chime_reset()
-    hmqtt.set_status("ready")
-    applog.info('chime finished')
-  
-    
-# TODO: order Lasers with pan/tilt motors. Like the turrets? ;-)       
-def strobeCb(msg):
-  global applog, hmqtt
-  applog.info(f'missing lasers for strobe {msg}, Cheapskate!')
-'''
 def start_muted():
   global applog, hmqtt
   applog.info(f'startup muting')
@@ -276,9 +136,11 @@ def main():
   hmqtt.controller = trumpy_recieve
   
   # Setup video capture if not using a mqttcamera
-  if settings.local_cam is not None:
-    applog.info(f'Using local camera: {settings.local_cam}')
-    video_dev = cv2.VideoCapture(settings.local_cam)
+  if settings.camera_type == "frigate":
+    applog.info(f"Using frigate camera: {settings.frigate_url}")
+  if settings.camera_type == "local":
+    applog.info(f'Using local camera: {settings.camera_number}')
+    video_dev = cv2.VideoCapture(settings.camera_number)
     video_dev.release()
   
   # Turn off display, mute mycroft
@@ -854,12 +716,29 @@ def request_picture(typ):
   payload = {"reply": topic,
               "path": path}
   applog.debug(f"capture ask {settings.camera_topic} {json.dumps(payload)}")
-  if settings.local_cam is None:
+  if settings.camera_type == "local":
     hmqtt.client.publish(settings.camera_topic, 'capture='+json.dumps(payload))
+  elif settings.camera_type == "frigate":
+    th = Thread(target=frigate_camera_capture_to_file, args=(json.dumps(payload),))
+    th.start()
   else:
     #th = Thread(target=capture_camera_capture_to_file, args=(json.dumps(payload),))
     #th.start()
     capture_camera_capture_to_file(json.dumps(payload))
+
+
+def frigate_camera_capture_to_file(jsonstr):
+  global applog, state_machine, hmqtt, settings
+  applog.debug("begin frigate capture on demand")
+  time.sleep(0.5)
+  args = json.loads(jsonstr)
+  rc = requests.get(settings.frigate_url)
+  if rc.status_code == 200:
+    snap_img = Image.open(BytesIO(rc.content))
+    snap_img.save(args['path'])
+    applog.debug("Frigate image written to {args['path']}")
+    # The publish below will wake US up to process the reply through the proper
+    hmqtt.client.publish(args['reply'], json.dumps({"cmd": "capture_done"}))    
 
 def capture_read_cam(dim):
   global video_dev
@@ -882,7 +761,7 @@ def capture_camera_capture_to_file(jsonstr):
   args = json.loads(jsonstr)
   applog.debug("begin capture on demand")
   
-  video_dev = cv2.VideoCapture(settings.local_cam)
+  video_dev = cv2.VideoCapture(settings.camera_number)
   fr = capture_read_cam((640,480))
   cv2.imwrite(args['path'], fr)
   video_dev.release()
@@ -1013,7 +892,7 @@ def image_serialize(frame):
 '''
 Zmq Trickiness: We can't detect that the zmq 'hub' is not answering
 until we try to send to it AND it times out. Then we can try a different
-Server. The working tracker will notify Kodi or Front Panel mpeg playes
+Server. The working tracker will notify Kodi or Front Panel mpeg players
 so we don't have to do that here.
 
 Beware: The tracker(s) are listening on a mqtt topic so they will both run
@@ -1034,14 +913,22 @@ def motion_track_zmq(display, panel):
   time.sleep(1)
   jpeg_quality = 95
   cnt = 0
+  lclcam = settings.camera_type == "local"
+  frigcam == setting.camera_type == "frigate"
   while not tracking_stop_flag:
-    tf, frame = video_dev.read()
-    if not tf:
-      applog.info('failed camera read')
-      continue
-    cnt += 1
-    ret_code, jpg_buffer = cv2.imencode(
-            ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+    if lclcam:
+      tf, frame = video_dev.read()
+      if not tf:
+        applog.info('failed camera read')
+        continue
+      cnt += 1
+      ret_code, jpg_buffer = cv2.imencode(
+              ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+    elif frigcam:
+      rc = requests.get(settings.frigate_url)
+      if rc.status_code == 200:
+        jpg_buffer = Image.open(BytesIO(rc.content))
+    
     try:
       zmqsender.send_jpg('trumpy4', jpg_buffer)
     except (zmq.ZMQError, zmq.ContextTerminated):
@@ -1072,23 +959,53 @@ def set_zmqSender():
     hmqtt.tracker(json.dumps({'begin':settings.zmq_tracker_ip[zmqSenderIdx],
         'debug': zmqDebug, 'panel': zmqPanel}))
     applog.info(f'trying tracker at {uri}')
-    zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=30, recv_timeout=30)
+    zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=2, recv_timeout=30)
     zmqSenderIdx += 1
     return 
   else:
     # out of servers to try.
     raise NuclearOption
-    
+#
+# opts = {
+#   "debug": <boolean>, # T => create a /tmp/tracker.avi file (default False)
+#   "test": <boolean>,  # T => tell login panel to play video stream instead of kodi
+#                               default is False - kodi only
+# V2: 
+#   "displays": [<topic_string>, ...] # Muliple topics can be triggered to watch stream
+#   "turrets": <boolean> # False => don't move turrets (default = True)
+#    }
+#
+def set_zmqSender(opts):
+  global settings
+  for zmq in settings.zmq_tracker_ip:
+    uri = f'tcp://{zmq}:{settings.zmq_port}'
+    try:
+      applog.info(f'trying tracker at {uri}')
+      zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=2, recv_timeout=5)
+    except socket.error as e: 
+      applog.warning('Zmq connect failing:', e)
+      continue
+    # wake up the front panel (login.py)
+    # 'homie/turret_tracker/track/control/set'
+    # 
+    hmqtt.tracker(json.dumps({'begin':zmq,
+        'debug': opts['debug'], 'panel': opts['test'],
+        'turrets': opts.get('turrets',True), 'displays': opts.get('displays', [])}))
+    break
+
+      
+
 
 # it gets complicated. we need some time for the server to get
 # cranking
 def begin_tracking(delay=0.1, debug=False, test=False):
   global hmqtt, applog, settings, tracking_stop_flag, video_dev
   global zmqsender, zmqSenderIdx, zmqDebug, zmqPanel
-  # open the camera 
-  video_dev = cv2.VideoCapture(settings.local_cam)
-  video_dev.set(3, 640)
-  video_dev.set(4, 480)
+  # if local, open the camera 
+  if settings.camera_type == "local":
+    video_dev = cv2.VideoCapture(settings.camera_number)
+    video_dev.set(3, 640)
+    video_dev.set(4, 480)
   # TODO: move hmqtt.tracker() call to inside zmqSender() ? 
   time.sleep(2) # 2 sec for camera to settle and for server to set up
   try:
@@ -1141,9 +1058,9 @@ def begin_calibrate(meters, secs):
   global settings, hmqtt, video_dev, applog, state_machine, ml_dict
   # create directory for 'meters' arg. Holds pict<n>.jpg and data.csv
   # files. 
-  if settings.local_cam is None:
-    applog.warn('The camera must be owned by TrumpyBear')
-    return
+  #if settings.local_cam is None:
+  #  applog.warn('The camera must be owned by TrumpyBear')
+  #  return
   from os import path
   path  = f'{os.getenv("HOME")}/.calib/{meters}M'
   if os.path.isdir(path):
@@ -1154,9 +1071,10 @@ def begin_calibrate(meters, secs):
   applog.info(f'Begin {meters} Meter sweep for {secs}')
   # csv format: f'{cnt}, {fr_num}, {range}, {x}, {y}, {ex}, {ey}, {area}, {ctr_x}, {ctr_y}
   # open camera, wait for two secs to warmup and human move to place.
-  video_dev = cv2.VideoCapture(settings.local_cam)
-  video_dev.set(3, 640)
-  video_dev.set(4, 480)
+  if settings.camera_type == "local":
+    video_dev = cv2.VideoCapture(settings.camera_number)
+    video_dev.set(3, 640)
+    video_dev.set(4, 480)
   mlobj = ml_dict['Cnn_Shapes']
 
   time.sleep(1+meters)
@@ -1174,12 +1092,17 @@ def begin_calibrate(meters, secs):
   rc = settings.use_ml == 'remote_rpc'
   #rc = False
   while time.time() <= et:
-    tf, frame = video_dev.read()
-    if tf is None:
-      # trouble ahead
-      applog.info('failed to get frame')
-      break
-    
+    if settings.camera_type == "local":
+      tf, frame = video_dev.read()
+      if tf is None:
+        # trouble ahead
+        applog.info('failed to get frame')
+        break
+    elif settings.camera_type == 'frigate':
+      rc = requests.get(settings.frigate_url)
+      if rc.status_code == 200:
+        frame = Image.open(BytesIO(rc.content))
+
     frnum += 1
     applog.info(f'have frame {frnum} {type(mlobj)}')
     # get a recog rect
@@ -1379,6 +1302,7 @@ def ranger_calib_machine(evt, arg=None):
       hmqtt.ranger_send(bfr)
   elif evt == Event.ranger:
     if trumpy_state == State.waitrange:
+      applog.info(f"ranger calibrate in: {arg}")
       # do something with arg
       dt = json.loads(arg)
       pv = {}
@@ -1386,9 +1310,9 @@ def ranger_calib_machine(evt, arg=None):
       pv['pw'] = dt['ex']-dt['x']
       pv['pa'] = pv['ph'] * pv['pw']
       pv['pp'] = pv['pa'] / (dt['w'] * dt['h'])
-      pv['cd'] = calib_distance
+      #pv['sf'] = calib_distance
+      #pv['cd'] = 1.0 / (pv['pp'] / pv['sf'])
       msg = json.dumps(pv)
-      applog.info(f"ranger calibrate in: {arg}")
       applog.info(f'ranger calibrate tmp: {msg}')
       next_state = State.initialized
       # send text message to Login's msg_hdr Tk widget (hdspt)
@@ -1404,14 +1328,14 @@ def ranger_calib_machine(evt, arg=None):
   sm_lock.release()
   
 def begin_ranger_calibrate(distance, delay): 
-  global calib_distance, state_machine
+  global calib_distance, state_machine, settings
   # set up new state machine and save current
   old_machine = state_machine 
   new_sm(ranger_calib_machine)
   # set up yet another timer in case we get stuck in the new machine
   # start the machine 
   time.sleep(delay)
-  calib_distance = distance
+  calib_distance = settings.ranger_scale #distance
   state_machine(Event.start, None)
   # back to previous statemachine ? How
   #new_sm(old_machine)

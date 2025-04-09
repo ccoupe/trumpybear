@@ -1,0 +1,49 @@
+{
+  "mqtt_server_ip": "bronco.local",
+  "mqtt_port": 1883,
+  "mqtt_client_name": "test_bear1",
+  "homie_device": "pi5_bear",
+  "homie_name": "Test Bear Pi5",
+  "camera_type": "frigate",
+  "camera_number": null,
+  "frigate_latest_url": "http://192.168.1.2:5000/api/pi5_cam/latest.jpg?h=480",
+  "camera_topic": "pi5_webcam",
+  "mycroft_ip": "pi4.local",
+  "ranger": {"type": "camera",
+        "cmd_topic": "homie/turret_tracker/ranger/image/set",
+        "distance_topic": "homie/turret_tracker/ranger/distance/set",
+        "upper_limit": 0.8,
+        "lower_limit": 0.25,
+        "scale": 0.4
+      },
+  "notify_topic": ["homie/pi5_screen/display/text/set"],
+  "enable_alarm": "homie/trumpy_enable/switch/state",
+  "cops_arrive":  "homie/trumpy_cops/switch/state",
+  "face_server_ip": ["bronco.local","bigboy.local", "mini.local"],
+  "face_port": 4785,
+  "ml_algo": "Cnn_Shapes",
+  "confidence": 0.4,
+  "zmq_tracker_ip": ["bronco.local","mini.local"],
+  "zmq_port": 4783,
+  "use_ml": "remote_zmq",
+  "turrets": [
+    {
+	"name": "Front Center",
+	"topic": "homie/turret_front/turret_1/control",
+    "front": true,
+	"pan_min": 51,
+	"pan_max": 150,
+	"tilt_min": 70,
+    "tilt_max": 120
+    },
+    {
+	"name": "Left Back",
+	"topic": "homie/turret_back/turret_1/control",
+    "front": false,
+	"pan_min": 60,
+	"pan_max": 180,
+	"tilt_min": 80,
+	"tilt_max": 120
+    }
+  ]
+}

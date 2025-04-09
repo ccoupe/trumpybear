@@ -23,7 +23,7 @@ class Homie_MQTT:
     
     # init server connection
     #self.client = mqtt.Client(settings.mqtt_client_name, False)
-    self.client = mqtt.Client(settings.mqtt_client_name, True)
+    self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, settings.mqtt_client_name, True)
     #self.client.max_queued_messages_set(3)
     hdevice = self.hdevice = self.settings.homie_device  # "device_name"
     hlname = self.hlname = self.settings.homie_name     # "Display Name"
@@ -61,7 +61,7 @@ class Homie_MQTT:
     sublist = [self.hurl_sub, self.hcmd_sub, self.hreply_sub, self.hrgrsub ]
       #self.hchime_sub, self.hsiren_sub, self.hstrobe_sub ]
     # camera motion detector
-    if settings.local_cam is None:
+    if settings.camera_type is None:
       flds = settings.camera_topic.split('/')
       flds[3] = 'motion'
       flds.pop()
