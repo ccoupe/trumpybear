@@ -11,15 +11,15 @@ PYENV ?= ${DESTDIR}/tb-env
 NODE := $(shell hostname)
 SHELL := /bin/bash 
 
-${PYENV}:
-	sudo mkdir -p ${PYENV}
-	sudo chown ${USER} ${PYENV}
-	python3 -m venv ${PYENV}
-	( \
-	set -e ;\
-	source ${PYENV}/bin/activate; \
-	pip install -r $(SRCDIR)/requirements.txt; \
-	)
+${PYENV}: ${SRCDIR}/requirements.txt
+	sudo mkdir -p ${DESTDIR}
+	sudo chown ${USER} ${DESTDIR}
+	sudo cp ${SRCDIR}/pyproject.toml ${DESTDIR}
+	uv python pin 3.11.2
+	uv venv --system-site-packages ${PYENV}
+	source ${PYENV}/bin/activate
+	uv python pin 3.11.2
+	uv add -r $(SRCDIR)/requirements.txt
 
 setup_launch:
 	systemctl --user daemon-reload
@@ -39,18 +39,20 @@ setup_dir:
 	sudo cp ${DESTDIR}/${SERVICE} /etc/xdg/systemd/user
 	
 update: 
-	sudo cp ${SRCDIR}/lib/Constants.py ${DESTDIR}/lib
-	sudo cp ${SRCDIR}/lib/Homie_MQTT.py ${DESTDIR}/lib
-	sudo cp ${SRCDIR}/lib/Settings.py ${DESTDIR}/lib
-	sudo cp ${SRCDIR}/lib/Audio.py ${DESTDIR}/lib
-	sudo cp ${SRCDIR}/lib/Constants.py ${DESTDIR}/lib
-	sudo cp ${SRCDIR}/lib/TrumpyBear.py ${DESTDIR}/lib
-	sudo cp -a ${SRCDIR}/lib/ImageZMQ ${DESTDIR}/lib
+	sudo cp ${SRCDIR}/Constants.py ${DESTDIR}
+	sudo cp ${SRCDIR}/Homie_MQTT.py ${DESTDIR}
+	sudo cp ${SRCDIR}/Settings.py ${DESTDIR}
+	sudo cp ${SRCDIR}/TrumpyBear.py ${DESTDIR}
+	sudo cp -a ${SRCDIR}/ImageZMQ ${DESTDIR}
 	sudo cp ${SRCDIR}/trumpy.py ${DESTDIR}
 	sudo cp ${SRCDIR}/${NODE}.json ${DESTDIR}
 	sudo chown -R ${USER} ${DESTDIR}
 
 install: ${PYENV} setup_dir update setup_launch
+
+lint:
+	 flake8 --indent-size 2 --max-line-length 90 --ignore=W293,F824 \
+--exclude .venv,${PYENV}
 
 clean: 
 	sudo systemctl --user stop ${SERVICE}

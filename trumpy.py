@@ -15,43 +15,42 @@
   
   Mycroft interactions are also through MQTT (and a proxy program too)
   
-  Remember - it's trumpybear. It doesn't need to be perfect - no one is 
-  going to look at the code. Right? 
+  Remember - it's trumpybear. It doesn't need to be perfect - no one is
+  going to look at the code. Right?
 '''
-import paho.mqtt.client as mqtt
+# import paho.mqtt.client as mqtt
 import sys
 import json
 import argparse
-import warnings
-from datetime import datetime
-import time, threading, sched
+# import warnings
+# from datetime import datetime
+import time
+import threading
 from threading import Lock, Thread
 import socket
 import os
 import shutil
 import traceback
-from subprocess import Popen
+# from subprocess import Popen
 from lib.Settings import Settings
 from lib.Homie_MQTT import Homie_MQTT
-from lib.Audio import AudioDev
+# from lib.Audio import AudioDev
 from lib.Constants import State, Event, Role
 from lib.TrumpyBear import TrumpyBear
-import urllib.request
+# import urllib.request
 import logging
 import logging.handlers
 import numpy as np
 import cv2
-import imutils
-from imutils.video import VideoStream
+# import imutils
+# from imutils.video import VideoStream
 # Face Recognition uses
 import websocket  # websocket-client
 import base64
 from PIL import Image
 import io
 import requests
-from io import BytesIO 
-
-
+from io import BytesIO
 # Tracking uses:
 from lib.ImageZMQ import imagezmq
 import zmq
@@ -75,61 +74,64 @@ play_mp3 = False
 player_obj = None
 zmqsender = None
 
+
 class NuclearOption(Exception):
   pass
 
+
 def start_muted():
   global applog, hmqtt
-  applog.info(f'startup muting')
+  applog.info('startup muting')
   hmqtt.display_cmd('off')
   hmqtt.tts_mute()
+
 
 def main():
   global settings, hmqtt, applog, audiodev, trumpy_state
   global state_machine, video_dev, ml_dict, startupTime
   # process cmdline arguments
-  loglevels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
+  # loglevels = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
   ap = argparse.ArgumentParser()
   ap.add_argument("-c", "--conf", required=True, type=str,
-    help="path and name of the json configuration file")
-  ap.add_argument("-s", "--syslog", action = 'store_true',
-    default=False, help="use syslog")
-  ap.add_argument("-q", "--quiet", action = 'store_true',
-    default=False, help="disable TTS")
+                  help="path and name of the json configuration file")
+  ap.add_argument("-s", "--syslog", action='store_true',
+                  default=False, help="use syslog")
+  ap.add_argument("-q", "--quiet", action='store_true',
+                  default=False, help="disable TTS")
   ap.add_argument("-d", "--debug", action='store', type=int, default='3',
-    nargs='?', help="debug level, default is 3")
-  ap.add_argument("-e", "--espeak", action = 'store_true',
-    default=False, help="use espeak TTS")
+                  nargs='?', help="debug level, default is 3")
+  ap.add_argument("-e", "--espeak", action='store_true',
+                  default=False, help="use espeak TTS")
   args = vars(ap.parse_args())
   
   # logging setup
   applog = logging.getLogger('trumpybear')
-  #applog.setLevel(args['log'])
+  # applog.setLevel(args['log'])
   if args['syslog']:
     applog.setLevel(logging.DEBUG)
-    handler = logging.handlers.SysLogHandler(address = '/dev/log')
+    handler = logging.handlers.SysLogHandler(address='/dev/log')
     # formatter for syslog (no date/time or appname. Just  msg, lux, luxavg
     formatter = logging.Formatter('%(name)s-%(levelname)-5s: %(message)-30s')
     handler.setFormatter(formatter)
     applog.addHandler(handler)
   else:
-    logging.basicConfig(level=logging.DEBUG,datefmt="%H:%M:%S",format='%(asctime)s %(levelname)-5s %(message)-40s')
+    logging.basicConfig(level=logging.DEBUG, datefmt="%H:%M:%S",
+                        format='%(asctime)s %(levelname)-5s %(message)-40s')
   
-  audiodev = AudioDev()
-  isDarwin = audiodev.isDarwin  
+  # audiodev = AudioDev()
+  # isDarwin = audiodev.isDarwin
   state_machine = tame_machine
   startupTime = time.time()
-  settings = Settings(args["conf"], 
-                      audiodev,
+  settings = Settings(args["conf"],
+                      # audiodev,
                       applog)
-  hmqtt = Homie_MQTT(settings, 
-                    None,
-                    None,
-                    None,
-                    None,
-                    state_machine)
+  hmqtt = Homie_MQTT(settings,
+                     None,
+                     None,
+                     None,
+                     None,
+                     state_machine)
   settings.print()
-  
     
   # TODO: minus style points here
   # set another callback function in the Mqtt Object for the TB state machine
@@ -151,7 +153,8 @@ def main():
   # All we do now is loop over a 5 minute delay
   # and let the threads do the work.
   while True:
-    time.sleep(5*60)
+    time.sleep(5 * 60)
+
 
 def new_sm(ns):
   global state_machine, trumpy_state, hmqtt
@@ -173,7 +176,7 @@ def tame_machine(evt, arg=None):
     next_state = State.starting
   elif evt == Event.motion:
     # ignore motion - stay in same state
-    next_state = cur_state    
+    next_state = cur_state
   elif evt == Event.abort:
     next_state = State.starting
   elif evt == Event.reply or evt == Event.pict:
@@ -187,17 +190,17 @@ def tame_machine(evt, arg=None):
   # unlock machine - now we can call long running things
   sm_lock.release()
   if trumpy_state == State.role_dispatch:
-    # should not happen? 
+    # should not happen?
     applog.info('tame: mic on')
     hmqtt.tts_unmute()
     tame_mycroft()
 
    
 # The state machine controls the interaction with mycroft(replys),
-# mqttcamera and other events. 
+# mqttcamera and other events.
 # BE WATCHFUL about threading
-#  mqtt calls into state_machine() on it's thread(s). 
-#  You can block it with a sleep(). That's OK in most situations. 
+#  mqtt calls into state_machine() on it's thread(s).
+#  You can block it with a sleep(). That's OK in most situations.
 #  Most of the sleeps are ad hoc timing to keep mycroft
 #  queue from building since it is LIFO
 def mean_machine(evt, arg=None):
@@ -210,7 +213,7 @@ def mean_machine(evt, arg=None):
   next_state = None
   if evt == Event.motion:
     # ignore motion
-    next_state = cur_state 
+    next_state = cur_state
   elif evt == Event.start:
     trumpy_state = State.starting
     next_state = State.waitrange
@@ -220,17 +223,18 @@ def mean_machine(evt, arg=None):
     hmqtt.display_text('Trumpy Bear is awake')
     # not used in trumpybear v2:
     # hmqtt.ask('awaken the hooligans')
-    #TODO: what is this: hmqtt.name()
+    # TODO: what is this: hmqtt.name()
     if settings.ranger_type is not None:
-      #hmqtt.ranger_mode(settings.ranger_mode)
-      #hmqtt.start_ranger(75)
+      # hmqtt.ranger_mode(settings.ranger_mode)
+      # hmqtt.start_ranger(75)
       # V2 uses a range
       start_ranger(settings.ranger_upper, settings.ranger_lower, State.waitrange)
   elif evt == Event.reply:
-    if arg != None:
+    if arg is not None:
       flds = arg.split('=')
       ans_typ = flds[0]
-      if len(flds) == 2: arg = flds[1]
+      if len(flds) == 2:
+        arg = flds[1]
     else:
       applog.warn("null arg")
     if trumpy_state == State.aborting or trumpy_state == State.initialized:
@@ -238,17 +242,17 @@ def mean_machine(evt, arg=None):
       # interacting (publishing to reply/set)
       applog.info('swallowing Event.reply in State.aborting')
       next_state = State.aborting
-      #pass
+      # pass
     elif trumpy_state == State.waitname:
       # have a name. Maybe.
-      if arg == None or arg == '':   
+      if arg is None or arg == '':
         if waitcnt < 2:
           next_state = State.waitname  # do over
           hmqtt.speak("I didn't catch that. Wait for the tone, Kay?")
           time.sleep(1)
           waitcnt += 1
           # not used in trumpybear v2:
-          #hmqtt.ask('awaken the hooligans')
+          # hmqtt.ask('awaken the hooligans')
           hmqtt.ask_name()
         else:
           next_state = State.role_dispatch
@@ -262,7 +266,8 @@ def mean_machine(evt, arg=None):
           hmqtt.speak(f"Verifying {trumpy_bear.name}")
           hmqtt.display_text(f"Verifying {trumpy_bear.name}")
         else:
-          hmqtt.speak("I'm going to take your picture. Face the bear and stand up straight")
+          hmqtt.speak("I'm going to take your picture. \
+Face the bear and stand up straight")
           hmqtt.display_text("Face the Bear")
           time.sleep(2)
         next_state = State.waitface
@@ -288,9 +293,9 @@ def mean_machine(evt, arg=None):
         applog.debug(f"answered {arg}")
         trumpy_bear.ans4 = arg
         if arg == 'talk':
-          # TODO: start mycroft 
+          # TODO: start mycroft
           next_state = State.role_dispatch
-        elif arg == 'music' or arg == None:
+        elif arg == 'music' or arg is None:
           # leave the state_machine cycle
           next_state = State.role_dispatch
         else:
@@ -313,7 +318,7 @@ def mean_machine(evt, arg=None):
       # recognition is synchronous, not an event
       vis_name = do_recog(trumpy_bear)
       applog.debug(f'recognized {vis_name} using {aud_name}')
-      if vis_name != None:
+      if vis_name is not None:
         vis_role = trumpy_bear.check_user(vis_name)
         if vis_role == Role.owner:
           trumpy_bear.name = aud_name
@@ -327,10 +332,10 @@ def mean_machine(evt, arg=None):
       hmqtt.speak('Got it')
       if trumpy_bear.role == Role.unknown:
         time.sleep(1)
-        next_state = State.four_qs 
+        next_state = State.four_qs
         hmqtt.display_text('You are Unknown')
         hmqtt.ask_music_or_talk()
-        #hmqtt.ask('send in the terrapin')
+        # hmqtt.ask('send in the terrapin')
       else:
         next_state = State.role_dispatch
         hmqtt.speak('Your access permissions are being checked, {}'.format(trumpy_bear.name))
@@ -346,7 +351,7 @@ def mean_machine(evt, arg=None):
       # timed out. Disappered from view. The perp can't follow instructions
       next_state = State.role_dispatch
       trumpy_bear = TrumpyBear(settings, 'perp')
-      hmqtt.speak('I asked nicely. Oh Well. You should have made a better choice.');
+      hmqtt.speak('I asked nicely. Oh Well. You should have made a better choice.')
     if trumpy_state == State.waitrange:
       # we ask for their name, which generates a Event.reply
       next_state = State.waitname
@@ -373,6 +378,7 @@ def mean_machine(evt, arg=None):
     trumpy_state = State.initialized
     role_dispatch(trumpy_bear)
 
+
 # Yes there is a lot of duplication. It's better than weird args and globals
 # - we have enough of those.
 def login_machine(evt, arg=None):
@@ -387,7 +393,7 @@ def login_machine(evt, arg=None):
     next_state = State.aborting
   elif evt == Event.motion:
     # ignore motion events
-    next_state = cur_state 
+    next_state = cur_state
   elif evt == Event.start:
     next_state = State.waitrecog
     time.sleep(1)
@@ -409,7 +415,7 @@ def login_machine(evt, arg=None):
       applog.debug(f'lm calling recog for {trumpy_bear}')
       vis_name = do_recog(trumpy_bear)
       applog.debug(f'recognized {vis_name}')
-      if vis_name != None and vis_name != 'None':
+      if vis_name is not None and vis_name != 'None':
         vis_role = trumpy_bear.check_user(vis_name)
         hmqtt.display_text(f'Hello {vis_name}. Unlocking')
         hmqtt.tts_unmute()
@@ -446,7 +452,8 @@ def login_machine(evt, arg=None):
   if trumpy_state == State.role_dispatch:
     trumpy_state = State.initialized
     trumpy_bear = None
-    # role_dispatch(trumpy_bear) 
+    # role_dispatch(trumpy_bear)
+
 
 def register_machine(evt, arg=None):
   global applog, settings, hmqtt, trumpy_state, trumpy_bear
@@ -460,7 +467,7 @@ def register_machine(evt, arg=None):
     next_state = State.aborting
   elif evt == Event.motion:
     # ignore motion events
-    next_state = cur_state 
+    next_state = cur_state
   elif evt == Event.start:
     trumpy_state = State.starting
     next_state = State.waitrange
@@ -468,16 +475,18 @@ def register_machine(evt, arg=None):
     hmqtt.set_status('running')
     hmqtt.tts_unmute()
     hmqtt.display_text('Trumpy Bear is waiting')
-    hmqtt.speak("Don't be shy. Come over here,  a meter away would be nice. Thats a yard, you know")
+    hmqtt.speak("Don't be shy. Come over here,  a meter away would be \
+nice. Thats a yard, you know")
     if settings.ranger_type is not None:
-      #hmqtt.ranger_mode(settings.ranger_mode)
-      #hmqtt.start_ranger(75)
+      # hmqtt.ranger_mode(settings.ranger_mode)
+      # hmqtt.start_ranger(75)
       start_ranger(settings.ranger_upper, settings.ranger_lower, State.waitrange)
   elif evt == Event.reply:
-    if arg != None:
+    if arg is not None:
       flds = arg.split('=')
-      ans_typ = flds[0]
-      if len(flds) == 2: arg = flds[1]
+      # ans_typ = flds[0]
+      if len(flds) == 2:
+        arg = flds[1]
     else:
       applog.warn("null arg")
     if trumpy_state == State.aborting:
@@ -486,7 +495,7 @@ def register_machine(evt, arg=None):
       next_state = State.aborting
     elif trumpy_state == State.waitname:
       # have a name. Maybe.
-      if arg == None or arg == '':   
+      if arg is None or arg == '':
         if waitcnt < 2:
           next_state = State.waitname  # do over
           hmqtt.speak("I didn't catch that. Wait for the tone, Kay?")
@@ -500,8 +509,9 @@ def register_machine(evt, arg=None):
       else:
         # Register
         trumpy_bear = TrumpyBear(settings, arg)
-        role = trumpy_bear.check_user(arg)
-        hmqtt.speak("I'm going to take your picture. Face the bear and please try to stand up straight.")
+        # role = trumpy_bear.check_user(arg)
+        hmqtt.speak("I'm going to take your picture. Face the bear and \
+please try to stand up straight.")
         hmqtt.display_text("Face the Bear")
         time.sleep(2)
         next_state = State.waitface
@@ -522,7 +532,8 @@ def register_machine(evt, arg=None):
         hmqtt.display_text(f'Registered {trumpy_bear.name}')
         hmqtt.speak("I guess you'll push the login button before I change my mind")
       else:
-        hmqtt.speak("Your name doesn't match the picture. Talk to Cecil, maybe he will care.")
+        hmqtt.speak("Your name doesn't match the picture. Talk to Cecil, \
+maybe he will care.")
         hmqtt.display_text("Please restart")
       next_state = State.starting
     else:
@@ -533,7 +544,7 @@ def register_machine(evt, arg=None):
     if rng == 0:
       # ranger timed out. They didn't follow instructions
       next_state = State.aborting
-      hmqtt.speak('Try Again');
+      hmqtt.speak('Try Again')
     elif trumpy_state == State.waitrange:
       next_state = State.waitname
       hmqtt.ask_name()
@@ -567,19 +578,21 @@ def role_dispatch(trumpy_bear):
   if role == Role.player:
     begin_rasa(trumpy_bear)
   elif role == Role.friend or role == Role.aquaintance or role == Role.relative:
-    #begin_mycroft()
+    # begin_mycroft()
     begin_glados()
   elif role == Role.owner:
-    hmqtt.speak("You are very annoying, {}. Are you with the failing New York Times?".format(trumpy_bear.name))
+    hmqtt.speak("You are very annoying, {}. Are you with the failing New \
+York Times?".format(trumpy_bear.name))
     interaction_finished()
   elif role == Role.unknown:
     if trumpy_bear.ans4 == 'talk':
-      #begin_mycroft()
+      # begin_mycroft()
       begin_glados()
     else:
       begin_intruder()
   else:
     interaction_finished()
+
 
 def logout_timer_fired():
   global hmqtt, applog, active_timer
@@ -587,13 +600,15 @@ def logout_timer_fired():
   hmqtt.display_cmd("off")
   hmqtt.tts_mute()
   applog.info('logging off')
-  
+
+
 def logout_timer(min=5):
   global active_timer
   print('creating logout timer')
   active_timer = threading.Timer(min * 60, logout_timer_fired)
   active_timer.start()
-  
+
+ 
 def extend_logout(min=3):
   global active_timer
   # cancel current timer
@@ -602,16 +617,19 @@ def extend_logout(min=3):
     active_timer.cancel()
     active_timer = None
   logout_timer(min)
+
   
 def long_timer_fired():
   print('timer_long fired')
   interaction_finished()
+
 
 def long_timer(min=5):
   global timerl_thread
   print('creating long timer')
   timerl_thread = threading.Timer(min * 60, long_timer_fired)
   timerl_thread.start()
+
 
 # called directly or via long_timer()
 def interaction_finished():
@@ -623,7 +641,8 @@ def interaction_finished():
   if state_machine == mean_machine:
     hmqtt.cops_arrive()
   new_sm(tame_machine)
-  
+
+ 
 def interaction_canceled():
   global hmqtt, warning_level, state_machine
   applog.info('canceled interaction')
@@ -632,14 +651,17 @@ def interaction_canceled():
   hmqtt.set_status('ready')
   new_sm(tame_machine)
 
+
 def begin_mycroft():
   global hmqtt, applog
   applog.info('starting mean mycroft')
   hmqtt.tts_unmute()
   long_timer(2)
-  hmqtt.speak('You have to say "Hey Mycroft", wait for the beep and then ask your question. \
-  Try "hey mycroft", what about the lasers')
+  hmqtt.speak('You have to say "Hey Mycroft", wait for the beep and \
+then ask your question. \
+Try "hey mycroft", what about the lasers')
   hmqtt.display_text("say 'Hey Mycroft'")
+
 
 def begin_glados():
   global hmqtt, applog
@@ -658,26 +680,28 @@ def tame_mycroft():
   long_timer(4)
   hmqtt.display_text("Mycroft Active")
 
+
 def begin_rasa(tb):
   global hmqtt, applog
   applog.info('starting rasa')
   hmqtt.display_text(f"{tb.name} to see Mr. Sanders")
-  #hmqtt.speak("Mister Sanders is not available {}. Try later.".format(tb.name))
+  # hmqtt.speak("Mister Sanders is not available {}. Try later.".format(tb.name))
   # not used in trumpybear v2:
   # hmqtt.ask('Mister Sanders, {} is here'.format(tb.name))
   long_timer(1)
-      
+
+ 
 def begin_intruder():
   global applog, hmqtt
   applog.info('begin intruder')
   hmqtt.start_music_alarm()      # sets mqtt switch to wake up a HE rule
   hmqtt.display_text("Lasers are Tracking")
-  begin_tracking(0.5, False, False);
+  begin_tracking(0.5, False, False)
   print('exiting intruder')
   long_timer(2)
 
 
-# return name string or None for the picture (path) in 
+# return name string or None for the picture (path) in
 # TrumpyBear object.
 def do_recog(tb):
   global applog, settings
@@ -707,23 +731,23 @@ def do_recog(tb):
   if len(names) == 0:
     names = [None]
   return names[0]
-  
+
+
 def request_picture(typ):
   global settings, hmqtt, applog, video_dev
   # get a picture from the camera
-  topic = "homie/%s/control/cmd/set" % settings.homie_device
+  topic = f"homie/{settings.homie_device}/control/cmd/set"
   path = f"/var/www/camera/{typ}.jpg"
-  payload = {"reply": topic,
-              "path": path}
+  payload = {"reply": topic, "path": path}
   applog.debug(f"capture ask {settings.camera_topic} {json.dumps(payload)}")
   if settings.camera_type == "local":
-    hmqtt.client.publish(settings.camera_topic, 'capture='+json.dumps(payload))
+    hmqtt.client.publish(settings.camera_topic, 'capture=' + json.dumps(payload))
   elif settings.camera_type == "frigate":
     th = Thread(target=frigate_camera_capture_to_file, args=(json.dumps(payload),))
     th.start()
   else:
-    #th = Thread(target=capture_camera_capture_to_file, args=(json.dumps(payload),))
-    #th.start()
+    # th = Thread(target=capture_camera_capture_to_file, args=(json.dumps(payload),))
+    # th.start()
     capture_camera_capture_to_file(json.dumps(payload))
 
 
@@ -738,7 +762,8 @@ def frigate_camera_capture_to_file(jsonstr):
     snap_img.save(args['path'])
     applog.debug("Frigate image written to {args['path']}")
     # The publish below will wake US up to process the reply through the proper
-    hmqtt.client.publish(args['reply'], json.dumps({"cmd": "capture_done"}))    
+    hmqtt.client.publish(args['reply'], json.dumps({"cmd": "capture_done"}))
+
 
 def capture_read_cam(dim):
   global video_dev
@@ -748,7 +773,7 @@ def capture_read_cam(dim):
   frame_n = None
   while cnt < 120:
     ret, frame = video_dev.read()
-    if ret == True and np.shape(frame) != ():
+    if ret is True and np.shape(frame) != ():
       frame_n = cv2.resize(frame, dim)
       break
     cnt += 1
@@ -756,18 +781,20 @@ def capture_read_cam(dim):
     print("Crashing soon")
   return frame_n
 
+
 def capture_camera_capture_to_file(jsonstr):
   global video_dev, applog, state_machine, hmqtt, settings
   args = json.loads(jsonstr)
   applog.debug("begin capture on demand")
   
   video_dev = cv2.VideoCapture(settings.camera_number)
-  fr = capture_read_cam((640,480))
+  fr = capture_read_cam((640, 480))
   cv2.imwrite(args['path'], fr)
   video_dev.release()
   applog.debug("local Capture to %s reply %s" % (args['path'], args['reply']))
-  #state_machine(Event.pict)
+  # state_machine(Event.pict)
   hmqtt.client.publish(args['reply'], json.dumps({"cmd": "capture_done"}))
+ 
   
 def wakeup_mean():
   global settings, hmqtt, applog
@@ -781,9 +808,10 @@ def wakeup_mean():
   state_machine(Event.start)
   hmqtt.client.publish(settings.status_topic, 'awakens')
   # if w/o ranger
-  #if settings.ranger_type == None:
+  # if settings.ranger_type == None:
   #  time.sleep(0.25)
   # state_machine(Event.ranger, )
+
 
 def wakeup_register():
   global settings, hmqtt, applog
@@ -796,6 +824,7 @@ def wakeup_register():
   hmqtt.tts_unmute()
   state_machine(Event.start)
   hmqtt.client.publish(settings.status_topic, 'registering')
+ 
   
 def wakeup_login():
   global settings, hmqtt, applog
@@ -808,19 +837,21 @@ def wakeup_login():
   state_machine(Event.start, 'login')
   hmqtt.client.publish(settings.status_topic, 'login')
 
+
 def begin_logout():
   global settings, hmqtt, applog, tracking_stop_flag, tame_machine
   global state_machine
-  hmqtt.display_cmd(self, 'off')
+  hmqtt.display_cmd('off')
   tracking_stop_flag = True
   new_sm(tame_machine)
-  
+
+
 # the command channel controls the device from hubitat via mqtt
 # AND from the Touch Screen (login) app
 def trumpy_recieve(jsonstr):
   global settings, hmqtt, applog, trumpy_bear, trumpy_state
   global state_machine, startupTime
-  if  time.time() < (startupTime + 30):
+  if time.time() < (startupTime + 30):
     # hack. ignore mqtt messages for 30 seconds.
     applog.info(f'ignoring {jsonstr}')
     return
@@ -845,7 +876,7 @@ def trumpy_recieve(jsonstr):
   elif cmd == 'register':
     wakeup_register()
   elif cmd == 'end':
-    # abort and reset. Hubitat can do this in a number of ways. 
+    # abort and reset. Hubitat can do this in a number of ways.
     state_machine(Event.abort)
   elif cmd == 'capture_done':
     if state_machine is None:
@@ -855,22 +886,22 @@ def trumpy_recieve(jsonstr):
     s = rargs.get('minutes', 2)
     extend_logout(s)
   elif cmd == 'mycroft':
-      #begin_mycroft()
+      # begin_mycroft()
       begin_glados()
   elif cmd == 'glados':
       begin_glados()
   elif cmd == 'track':
     try:
-      dbg = rargs.get('debug',False)
-      test = rargs.get('test',False)
+      dbg = rargs.get('debug', False)
+      test = rargs.get('test', False)
       applog.info('calling begin_tracking')
       begin_tracking(0.1, dbg, test)
     except:
       traceback.print_exc()
   elif cmd == 'ranger_test':
-    begin_ranger_calibrate(rargs['distance'],rargs['delay'])
+    begin_ranger_calibrate(rargs['distance'], rargs['delay'])
   elif cmd == 'calib':
-    begin_calibrate(rargs['distance'],rargs['time'])
+    begin_calibrate(rargs['distance'], rargs['time'])
   elif cmd == 'closing':
     # Front panel logoff - probably manual.
     begin_logout
@@ -878,13 +909,13 @@ def trumpy_recieve(jsonstr):
     dt = {'cmd': 'set_turrets', 'turrets': settings.turrets}
     hmqtt.login(json.dumps(dt))
   elif cmd == 'alarm':
-    #TODO not needed? HE already knows? 
+    # TODO not needed? HE already knows?
     pass
     
   
 def image_serialize(frame):
-  image = frame 
-  _, jpg = cv2.imencode('.jpg',image)
+  image = frame
+  _, jpg = cv2.imencode('.jpg', image)
   bfr = jpg.tostring()
   return bfr
 
@@ -906,6 +937,7 @@ zmqSenderIdx = 0
 zmqDebug = False
 zmqPanel = True
 
+
 def motion_track_zmq(display, panel):
   global tracking_stop_flag, video_dev, zmqsender, zmqSenderIdx, applog
   global settings
@@ -914,7 +946,7 @@ def motion_track_zmq(display, panel):
   jpeg_quality = 95
   cnt = 0
   lclcam = settings.camera_type == "local"
-  frigcam == setting.camera_type == "frigate"
+  frigcam = settings.camera_type == "frigate"
   while not tracking_stop_flag:
     if lclcam:
       tf, frame = video_dev.read()
@@ -923,7 +955,7 @@ def motion_track_zmq(display, panel):
         continue
       cnt += 1
       ret_code, jpg_buffer = cv2.imencode(
-              ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
+        ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
     elif frigcam:
       rc = requests.get(settings.frigate_url)
       if rc.status_code == 200:
@@ -937,63 +969,69 @@ def motion_track_zmq(display, panel):
       applog.info(f'failed sending frame# {cnt} trying next server')
       traceback.print_exc()
       
-    #applog.info(f'sent {cnt}')
+    # applog.info(f'sent {cnt}')
   
-  applog.info(f'closing image socket, {cnt} , {cnt/120} fps')
-  #zmqsender.close() # There is no close(). 
+  applog.info(f'closing image socket, {cnt} , {cnt / 120} fps')
+  # zmqsender.close() # There is no close().
   zmqsender = None
   zmqSenderIdx = 0
   video_dev.release()
+
   
-def tracking_timer(minutes=0.5,testing=False):
+def tracking_timer(minutes=0.5, testing=False):
   print('creating tracking timer')
   tracking_thread = threading.Timer(minutes * 60, tracking_finished, args=(testing,))
   tracking_thread.start()
 
-# TODO - Enable backup zmqtracker - 
+
+'''
+# TODO - Enable backup zmqtracker
 # how to detect failure and switch over.
 def set_zmqSender():
   global settings, zmqsender, zmqSenderIdx, zmqDebug, zmqPanel
   if zmqSenderIdx < len(settings.zmq_tracker_ip):
     uri = f'tcp://{settings.zmq_tracker_ip[zmqSenderIdx]}:{settings.zmq_port}'
-    hmqtt.tracker(json.dumps({'begin':settings.zmq_tracker_ip[zmqSenderIdx],
+    hmqtt.tracker(json.dumps({'begin': settings.zmq_tracker_ip[zmqSenderIdx],
         'debug': zmqDebug, 'panel': zmqPanel}))
     applog.info(f'trying tracker at {uri}')
     zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=2, recv_timeout=30)
     zmqSenderIdx += 1
-    return 
+    return
   else:
     # out of servers to try.
     raise NuclearOption
+'''
 #
 # opts = {
 #   "debug": <boolean>, # T => create a /tmp/tracker.avi file (default False)
 #   "test": <boolean>,  # T => tell login panel to play video stream instead of kodi
 #                               default is False - kodi only
-# V2: 
+# V2:
 #   "displays": [<topic_string>, ...] # Muliple topics can be triggered to watch stream
 #   "turrets": <boolean> # False => don't move turrets (default = True)
 #    }
 #
-def set_zmqSender(opts):
+
+
+def set_zmqSender(opts={}):
   global settings
-  for zmq in settings.zmq_tracker_ip:
+  for zm in settings.zmq_tracker_ip:
     uri = f'tcp://{zmq}:{settings.zmq_port}'
     try:
       applog.info(f'trying tracker at {uri}')
-      zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=2, recv_timeout=5)
-    except socket.error as e: 
+      zmqsender = imagezmq.ImageSender(connect_to=uri, send_timeout=2,
+                                       recv_timeout=5)
+    except socket.error as e:
       applog.warning('Zmq connect failing:', e)
       continue
     # wake up the front panel (login.py)
     # 'homie/turret_tracker/track/control/set'
-    # 
-    hmqtt.tracker(json.dumps({'begin':zmq,
-        'debug': opts['debug'], 'panel': opts['test'],
-        'turrets': opts.get('turrets',True), 'displays': opts.get('displays', [])}))
+    #
+    hmqtt.tracker(json.dumps({'begin': zm,
+                              'debug': opts['debug'], 'panel': opts['test'],
+                              'turrets': opts.get('turrets', True),
+                              'displays': opts.get('displays', [])}))
     break
-
-      
 
 
 # it gets complicated. we need some time for the server to get
@@ -1001,15 +1039,15 @@ def set_zmqSender(opts):
 def begin_tracking(delay=0.1, debug=False, test=False):
   global hmqtt, applog, settings, tracking_stop_flag, video_dev
   global zmqsender, zmqSenderIdx, zmqDebug, zmqPanel
-  # if local, open the camera 
+  # if local, open the camera
   if settings.camera_type == "local":
     video_dev = cv2.VideoCapture(settings.camera_number)
     video_dev.set(3, 640)
     video_dev.set(4, 480)
-  # TODO: move hmqtt.tracker() call to inside zmqSender() ? 
-  time.sleep(2) # 2 sec for camera to settle and for server to set up
+  # TODO: move hmqtt.tracker() call to inside zmqSender() ?
+  time.sleep(2)  # 2 sec for camera to settle and for server to set up
   try:
-    if settings.use_ml == 'remote_zmq': 
+    if settings.use_ml == 'remote_zmq':
       zmqSenderIdx = 0
       zmqDebug = debug
       zmqPanel = test
@@ -1019,18 +1057,19 @@ def begin_tracking(delay=0.1, debug=False, test=False):
     tracking_stop_flag = False
     tracking_timer(delay, testing=test)
     if settings.use_ml == 'remote_zmq':
-      trk_thread = Thread(target=motion_track_zmq, args=(debug,test))
-    #elif settings.use_ml == 'remote_rpc':
+      trk_thread = Thread(target=motion_track_zmq, args=(debug, test))
+    # elif settings.use_ml == 'remote_rpc':
     #  trk_thread = Thread(target=motion_track_rpc, args=(debug,test))
     trk_thread.start()
   except:
     traceback.print_exc()
+
   
 def tracking_finished(test):
   global tracking_stop_flag, applog, settings, hmqtt
   tracking_stop_flag = True
   applog.info('tracking timer fired')
-  hmqtt.tracker(json.dumps({'end':True,'panel':test}))
+  hmqtt.tracker(json.dumps({'end': True, 'panel': test}))
 
     
 def calib_machine(evt, arg=None):
@@ -1056,13 +1095,14 @@ def calib_machine(evt, arg=None):
 
 def begin_calibrate(meters, secs):
   global settings, hmqtt, video_dev, applog, state_machine, ml_dict
+  old_machine = state_machine
   # create directory for 'meters' arg. Holds pict<n>.jpg and data.csv
-  # files. 
-  #if settings.local_cam is None:
+  # files.
+  # if settings.local_cam is None:
   #  applog.warn('The camera must be owned by TrumpyBear')
   #  return
-  from os import path
-  path  = f'{os.getenv("HOME")}/.calib/{meters}M'
+  # from os import path  # shadowed by var named path. A bug! TODO
+  path = f'{os.getenv("HOME")}/.calib/{meters}M'
   if os.path.isdir(path):
     shutil.rmtree(path)
   os.makedirs(path)
@@ -1077,20 +1117,20 @@ def begin_calibrate(meters, secs):
     video_dev.set(4, 480)
   mlobj = ml_dict['Cnn_Shapes']
 
-  time.sleep(1+meters)
+  time.sleep(1 + meters)
   # compute ending time.
   now = time.time()
   et = now + secs
   applog.info(f'begin {time.time()} --> {et}')
   # Need a new state machine for dealing with Evt.Ranger coming in aysnchronously
-  #old_machine = state_machine # save current
-  #new_sm(calib_machine)
+  # old_machine = state_machine # save current
+  # new_sm(calib_machine)
   # turn on ranger.
   
   frnum = 0
   cnt = 0
   rc = settings.use_ml == 'remote_rpc'
-  #rc = False
+  # rc = False
   while time.time() <= et:
     if settings.camera_type == "local":
       tf, frame = video_dev.read()
@@ -1109,15 +1149,16 @@ def begin_calibrate(meters, secs):
     
     if rc:
       # send frame to rpc, get back a (boolean, rect) if true, then rect is good
-      found, rect = mlobj.proxy.root.detectors (settings.ml_algo, False, 
-          settings.confidence, image_serialize(frame))
+      found, rect = mlobj.proxy.root.detectors(settings.ml_algo, False,
+                                               settings.confidence,
+                                               image_serialize(frame))
     else:
-      found, rect = mlobj.proxy(settings.ml_algo, False, 
-          settings.confidence, frame)
-    if found: 
-      #print(f'{type(rect)} {rect}')
+      found, rect = mlobj.proxy(settings.ml_algo, False,
+                                settings.confidence, frame)
+    if found:
+      # print(f'{type(rect)} {rect}')
       (x, y, ex, ey) = rect
-      cv2.rectangle(frame,(x,y),(ex,ey),(0,255,210),4)
+      cv2.rectangle(frame, (x, y), (ex, ey), (0, 255, 210), 4)
       cnt += 1
       # save pict
       fn = f'{path}/pict{cnt}.jpg'
@@ -1127,10 +1168,10 @@ def begin_calibrate(meters, secs):
       ctr_x = int((w / 2) + x)
       ctr_y = int((h / 2) + y)
       # append to data file
-      msg = f'{frnum},{cnt},{x},{y},{ex},{ey},{w*h},{ctr_x},{ctr_y}'
+      msg = f'{frnum},{cnt},{x},{y},{ex},{ey},{w * h},{ctr_x},{ctr_y}'
       csvf.write(f'{msg},{fn}\n')
-      #dt = {'cmd': 'tracking', 'msg': msg} 
-      #hmqtt.login(json.dumps(dt))
+      # dt = {'cmd': 'tracking', 'msg': msg}
+      # hmqtt.login(json.dumps(dt))
       
   applog.info('closing sweep')
   # close data file
@@ -1140,7 +1181,6 @@ def begin_calibrate(meters, secs):
   # turn off ranger.
   # reset statemachine
   new_sm(old_machine)
-  
 
 
 def image_to_byte_array(image: Image) -> bytes:
@@ -1152,6 +1192,7 @@ def image_to_byte_array(image: Image) -> bytes:
   imgByteArr = imgByteArr.getvalue()
   return imgByteArr
 
+
 '''
 #
 # ------------------ Ranger state machine ---- is it Evil?
@@ -1159,7 +1200,7 @@ def image_to_byte_array(image: Image) -> bytes:
 # else:
 # create a new thread and state machine that gets an image from the camera
 # converts it to base64 and publishes that to zmqtracker
-# get the result (from mqtt) and check against bounds 
+# get the result (from mqtt) and check against bounds
 # issue messages/speech to go back, move forward.
 # when the distance is within bounds, restore to old state_machine
 # generate an Event.Ranger which will stop this thread.
@@ -1178,6 +1219,7 @@ ranger_timer = None
 ranger_target_upper = 1
 ranger_target_lower = 0
 
+
 def ranger_distance_machine(evt, arg=None):
   global hmqtt, sm_lock, trumpy_state, applog
   global ranger_thread, ranger_opt, ranger_previous_machine, state_machine
@@ -1192,11 +1234,11 @@ def ranger_distance_machine(evt, arg=None):
   if evt == Event.start:
     ranger_target_upper = arg[0]
     ranger_target_lower = arg[1]
-    if  arg[0] == 0 and  arg[1] == 0:
+    if arg[0] == 0 and arg[1] == 0:
       ranger_opt = 0
     else:
       ranger_opt = 1
-    # ask camera process for a picture 
+    # ask camera process for a picture
     next_state = State.waitface
     request_picture('person')
   elif evt == Event.pict:
@@ -1211,7 +1253,7 @@ def ranger_distance_machine(evt, arg=None):
         next_state = State.ranger_loop
       hmqtt.ranger_send(bfr)
     else:
-      applog.info(f'rgm: bad state for Event.pict')
+      applog.info('rgm: bad state for Event.pict')
   elif evt == Event.ranger:
     # if we have an dict arg, decode it
     dt = json.loads(arg)
@@ -1224,7 +1266,7 @@ def ranger_distance_machine(evt, arg=None):
         # be leaving soon...
         next_state = State.ranger_leave
       elif trumpy_state == State.ranger_loop:
-        if pa <=  ranger_target_upper and pa >= ranger_target_lower:
+        if pa <= ranger_target_upper and pa >= ranger_target_lower:
           exit_arg = pa
           # be leaving soon...
           next_state = State.ranger_leave
@@ -1239,44 +1281,47 @@ def ranger_distance_machine(evt, arg=None):
       next_state = State.waitface
       request_picture('person')
   else:
-      applog.info(f'rgm: bad state for Event.ranger')
+    applog.info('rgm: bad state for Event.ranger')
       
   trumpy_state = next_state
   applog.debug("rgm exit {} {} => {}".format(cur_state, evt, trumpy_state))
-  # unlock machine 
-  sm_lock.release()  
+  # unlock machine
+  sm_lock.release()
   if trumpy_state == State.ranger_leave:
     # very tricky, call the previous State machine with Event.ranger
     # restore previous state_machine
     trumpy_state = ranger_previous_state
     state_machine = ranger_previous_machine
-    hmqtt.state_machine = state_machine # Evil shadow var?
+    hmqtt.state_machine = state_machine  # Evil shadow var?
     # cancel timer
     if ranger_timer:
       ranger_timer.cancel()
       ranger_timer = None
     applog.info(f'Leaving range_machine, Event.ranger,{exit_arg} state: {trumpy_state}')
-    state_machine(Event.ranger,exit_arg)
+    state_machine(Event.ranger, exit_arg)
+
     
 def ranger_timer_fired():
   global ranger_thread, ranger_previous_machine, ranger_previous_state, state_machine
   state_machine = ranger_previous_machine
-  trumpy_state = ranger_previous_state
+  # trumpy_state = ranger_previous_state
   state_machine(Event.ranger, 0)
-  
+
+
 def start_ranger(upper, lower, return_state):
   global ranger_thread, ranger_previous_machine, ranger_previous_state, state_machine
   global trumpy_state
   # set up new state machine and save current
-  ranger_previous_machine = state_machine 
+  ranger_previous_machine = state_machine
   ranger_previous_state = return_state
   new_sm(ranger_distance_machine)
   # TODO: set up yet another timer in case we get stuck in the new machine
   ranger_timer = threading.Timer(2 * 60, ranger_timer_fired)
   ranger_timer.start()
-  # start the machine 
+  # start the machine
   ranger_thread = Thread(target=state_machine, args=(Event.start, (upper, lower)))
   ranger_thread.start()
+
 
 # ---------- Ranger Calibration ----------
 def ranger_calib_machine(evt, arg=None):
@@ -1306,12 +1351,12 @@ def ranger_calib_machine(evt, arg=None):
       # do something with arg
       dt = json.loads(arg)
       pv = {}
-      pv['ph'] = dt['ey']-dt['y']
-      pv['pw'] = dt['ex']-dt['x']
+      pv['ph'] = dt['ey'] - dt['y']
+      pv['pw'] = dt['ex'] - dt['x']
       pv['pa'] = pv['ph'] * pv['pw']
       pv['pp'] = pv['pa'] / (dt['w'] * dt['h'])
-      #pv['sf'] = calib_distance
-      #pv['cd'] = 1.0 / (pv['pp'] / pv['sf'])
+      # pv['sf'] = calib_distance
+      # pv['cd'] = 1.0 / (pv['pp'] / pv['sf'])
       msg = json.dumps(pv)
       applog.info(f'ranger calibrate tmp: {msg}')
       next_state = State.initialized
@@ -1326,19 +1371,21 @@ def ranger_calib_machine(evt, arg=None):
   
   # unlock machine - now we can call long running things
   sm_lock.release()
-  
-def begin_ranger_calibrate(distance, delay): 
+
+
+def begin_ranger_calibrate(distance, delay):
   global calib_distance, state_machine, settings
   # set up new state machine and save current
-  old_machine = state_machine 
+  old_machine = state_machine
   new_sm(ranger_calib_machine)
   # set up yet another timer in case we get stuck in the new machine
-  # start the machine 
+  # start the machine
   time.sleep(delay)
-  calib_distance = settings.ranger_scale #distance
+  calib_distance = settings.ranger_scale  # distance
   state_machine(Event.start, None)
   # back to previous statemachine ? How
-  #new_sm(old_machine)
+  new_sm(old_machine)
   
+
 if __name__ == '__main__':
   sys.exit(main())
