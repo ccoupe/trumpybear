@@ -1,6 +1,6 @@
 #
 #
-from lib.Constants import Role
+from Constants import Role
 import json
 import os
 import shutil

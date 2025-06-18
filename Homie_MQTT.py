@@ -3,7 +3,7 @@ import paho.mqtt.client as mqtt
 # import sys
 import traceback
 # import json
-from lib.Constants import Event
+from Constants import Event
 # from datetime import datetime
 # import time
 from threading import Thread

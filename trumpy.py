@@ -32,11 +32,11 @@ import os
 import shutil
 import traceback
 # from subprocess import Popen
-from lib.Settings import Settings
-from lib.Homie_MQTT import Homie_MQTT
+from Settings import Settings
+from Homie_MQTT import Homie_MQTT
 # from lib.Audio import AudioDev
-from lib.Constants import State, Event, Role
-from lib.TrumpyBear import TrumpyBear
+from Constants import State, Event, Role
+from TrumpyBear import TrumpyBear
 # import urllib.request
 import logging
 import logging.handlers
@@ -52,7 +52,7 @@ import io
 import requests
 from io import BytesIO
 # Tracking uses:
-from lib.ImageZMQ import imagezmq
+from ImageZMQ import imagezmq
 import zmq
 
 # globals
