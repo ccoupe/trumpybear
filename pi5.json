@@ -6,7 +6,7 @@
   "homie_name": "Test Bear Pi5",
   "camera_type": "frigate",
   "camera_number": null,
-  "frigate_latest_url": "http://192.168.1.2:5000/api/pi5_cam/latest.jpg?h=480",
+  "frigate_latest_url": "http://192.168.1.47:5000/api/pi5_cam/latest.jpg?h=480",
   "camera_topic": "pi5_webcam",
   "mycroft_ip": "pi4.local",
   "ranger": {"type": "camera",

@@ -3,6 +3,7 @@ imutils
 zmq
 paho-mqtt
 websocket-client
+requests
 pillow
 python-vlc
 websockets

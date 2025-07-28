@@ -7,6 +7,7 @@ SRCDIR ?= $(HOME)/Projects/iot/${PRJ}
 LAUNCH ?= ${PRJ}.sh
 SERVICE ?= $(PRJ).service
 PYENV ?= ${DESTDIR}/tb-env
+PYVER ?= 3.11.2
 
 NODE := $(shell hostname)
 SHELL := /bin/bash 
@@ -14,12 +15,12 @@ SHELL := /bin/bash
 ${PYENV}: ${SRCDIR}/requirements.txt
 	sudo mkdir -p ${DESTDIR}
 	sudo chown ${USER} ${DESTDIR}
-	sudo cp ${SRCDIR}/pyproject.toml ${DESTDIR}
-	uv python pin 3.11.2
-	uv venv --system-site-packages ${PYENV}
-	source ${PYENV}/bin/activate
-	uv python pin 3.11.2
-	uv add -r $(SRCDIR)/requirements.txt
+	uv venv --python ${PYVER} --no-project ${PYENV}
+	( \
+	set -e ;\
+	source ${PYENV}/bin/activate ; \
+	uv pip install -r $(SRCDIR)/requirements.txt ; \
+	)
 
 setup_launch:
 	systemctl --user daemon-reload
